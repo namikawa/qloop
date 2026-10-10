@@ -1,13 +1,53 @@
-import { useState } from 'react';
-import type { Deck } from '../core/models';
+import { useEffect, useState } from 'react';
+import type { Deck, Question, Session } from '../core/models';
+import { population } from '../core/quiz';
 import deckJson from '../generated/deck.json';
 import { shouldShowInstallBanner } from '../pwa/standalone';
 import { useAppUpdate } from '../pwa/update';
+import { openDb, requestPersistentStorage } from '../storage/db';
+import { ProgressStore } from '../storage/progress-store';
 import { Home } from './screens/Home';
+import { Quiz, type QuizResult } from './screens/Quiz';
+import { QuizSetup } from './screens/QuizSetup';
+import { Result } from './screens/Result';
 
 const deck = deckJson as Deck;
-const coreCount = deck.events.filter((event) => event.role === 'core').length;
+const targets = population(deck);
 const poolCount = deck.events.filter((event) => event.role === 'pool').length;
+
+/** 画面の状態。ルーティングライブラリは使わず、アプリ内の状態で切り替える（設計書 3 章）。 */
+type View =
+  | { screen: 'home' }
+  | { screen: 'setup' }
+  | { screen: 'quiz'; session: Session; questions: Question[] }
+  | { screen: 'result'; result: QuizResult };
+
+/** 学習の記録（IndexedDB）の準備の状態。 */
+type StoreState =
+  | { status: 'loading' }
+  | { status: 'ready'; store: ProgressStore }
+  | { status: 'error'; message: string };
+
+let storePromise: Promise<ProgressStore> | null = null;
+
+/** データベースを開いて成績を読み込む。起動の間に 1 回だけ行う（開発時の StrictMode の再実行でも開き直さない）。 */
+function loadStore(): Promise<ProgressStore> {
+  storePromise ??= (async () => {
+    const db = await openDb();
+    const store = new ProgressStore({ db });
+    await store.load();
+    requestPersistentStorage();
+    return store;
+  })();
+  return storePromise;
+}
+
+function describeError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message !== '' ? error.message : error.name;
+  }
+  return String(error);
+}
 
 export function App() {
   // 帯を閉じた状態は起動の間だけ持つ（保存しない）。画面を切り替えても戻らないよう App で持つ。
@@ -15,13 +55,69 @@ export function App() {
     shouldShowInstallBanner(navigator),
   );
   const update = useAppUpdate();
+  const [storeState, setStoreState] = useState<StoreState>({ status: 'loading' });
+  const [view, setView] = useState<View>({ screen: 'home' });
+
+  useEffect(() => {
+    let active = true;
+    loadStore().then(
+      (store) => {
+        if (active) {
+          setStoreState({ status: 'ready', store });
+        }
+      },
+      (error: unknown) => {
+        if (active) {
+          setStoreState({ status: 'error', message: describeError(error) });
+        }
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // 画面を切り替えたら先頭から表示する
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [view]);
+
+  const store = storeState.status === 'ready' ? storeState.store : null;
+
+  if (store !== null && view.screen === 'setup') {
+    return (
+      <QuizSetup
+        store={store}
+        population={targets}
+        allEvents={deck.events}
+        onStart={(session, questions) => setView({ screen: 'quiz', session, questions })}
+        onBack={() => setView({ screen: 'home' })}
+      />
+    );
+  }
+  if (store !== null && view.screen === 'quiz') {
+    return (
+      <Quiz
+        key={view.session.id}
+        store={store}
+        session={view.session}
+        questions={view.questions}
+        onFinish={(result) => setView({ screen: 'result', result })}
+      />
+    );
+  }
+  if (view.screen === 'result') {
+    return <Result result={view.result} onHome={() => setView({ screen: 'home' })} />;
+  }
 
   return (
     <Home
       deckName={deck.name}
-      coreCount={coreCount}
+      targetCount={targets.length}
       poolCount={poolCount}
       version={__APP_VERSION__}
+      storeStatus={storeState}
+      onStartQuiz={() => setView({ screen: 'setup' })}
       installBannerVisible={installBannerVisible}
       onCloseInstallBanner={() => setInstallBannerVisible(false)}
       updateAvailable={update.available}

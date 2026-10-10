@@ -166,7 +166,7 @@ CSV の形式: UTF-8（先頭の BOM は許容）、改行は LF と CRLF のど
 |---|---|---|
 | `attempts` | `id`（自動採番） | 回答の記録。`eventId`、`pattern`（`yearInput` / `choice`）、`correct`、`answeredAt`（UTC の ISO 8601 文字列）、`sessionId`。索引: `byEvent`(eventId)、`byAnsweredAt`(answeredAt)、`bySession`(sessionId)。追記のみで、これが正本 |
 | `eventStats` | `[eventId, pattern]` | 出来事 × パターンの集計。`attempts`（回答数）、`correct`、`lastAnsweredAt`、`lastCorrect`、`lastWrongAt`。成績画面と復習はこれを読む |
-| `sessions` | `id`（UUID） | `mode`（`normal` / `review`）、`pattern`（`yearInput` / `choice` / `mixed`。復習は `null`）、`range`、`startedAt`、`endedAt`（未終了は `null`）、`total`（生成した問題数）、`answered`、`correct` |
+| `sessions` | `id`（UUID） | `mode`（`normal` / `review`）、`pattern`（`yearInput` / `choice` / `mixed`。復習は `null`）、`range`（復習は範囲を選ばないので `null`）、`startedAt`、`endedAt`（未終了は `null`）、`total`（生成した問題数）、`answered`、`correct` |
 | `meta` | `key` | `settings`（最後に選んだパターン・問題数・範囲）、`studyDays`（回答のあった端末ローカルの暦日 `YYYY-MM-DD` の一覧） |
 
 - 1 回答ごとに 1 つのトランザクションで、`attempts` への追記、`eventStats` の更新、`sessions` の `answered`・`correct` の更新、`meta.studyDays` の更新を行う。

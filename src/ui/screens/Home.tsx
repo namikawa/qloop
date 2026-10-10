@@ -1,10 +1,17 @@
 import { Banner } from '../components/Banner';
 
+/** 学習の記録（IndexedDB）の準備の状態。 */
+export type StoreStatus =
+  { status: 'loading' } | { status: 'ready' } | { status: 'error'; message: string };
+
 interface HomeProps {
   deckName: string;
-  coreCount: number;
+  /** 出題対象（母集団）の件数。 */
+  targetCount: number;
   poolCount: number;
   version: string;
+  storeStatus: StoreStatus;
+  onStartQuiz: () => void;
   installBannerVisible: boolean;
   onCloseInstallBanner: () => void;
   updateAvailable: boolean;
@@ -13,9 +20,11 @@ interface HomeProps {
 
 export function Home({
   deckName,
-  coreCount,
+  targetCount,
   poolCount,
   version,
+  storeStatus,
+  onStartQuiz,
   installBannerVisible,
   onCloseInstallBanner,
   updateAvailable,
@@ -60,7 +69,7 @@ export function Home({
           <dl className="deck-counts">
             <div className="deck-count">
               <dt>出題対象</dt>
-              <dd data-testid="core-count">{coreCount} 件</dd>
+              <dd data-testid="target-count">{targetCount} 件</dd>
             </div>
             <div className="deck-count">
               <dt>誤答用</dt>
@@ -68,6 +77,35 @@ export function Home({
             </div>
           </dl>
         </section>
+
+        {storeStatus.status === 'loading' && (
+          <p className="status-text" role="status">
+            学習の記録を読み込んでいます…
+          </p>
+        )}
+        {storeStatus.status === 'error' && (
+          <div className="error-box" role="alert">
+            <p className="error-box-title">学習の記録を開けないため、学習を始められません</p>
+            <p className="error-box-detail">理由: {storeStatus.message}</p>
+          </div>
+        )}
+
+        <div className="home-actions">
+          <button
+            type="button"
+            className="button-primary"
+            disabled={storeStatus.status !== 'ready'}
+            onClick={onStartQuiz}
+          >
+            出題
+          </button>
+          <button type="button" className="button-secondary" disabled>
+            復習（準備中）
+          </button>
+          <button type="button" className="button-secondary" disabled>
+            成績（準備中）
+          </button>
+        </div>
       </main>
 
       <footer className="footer" data-testid="version">

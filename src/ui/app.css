@@ -129,3 +129,506 @@ button {
   font-size: 12px;
   text-align: center;
 }
+
+/* ---- 共通のボタンと文字 ---- */
+
+input {
+  font: inherit;
+}
+
+.button-primary,
+.button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.button-primary {
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.button-primary:disabled {
+  border-color: #a7bce6;
+  background: #a7bce6;
+  cursor: default;
+}
+
+.button-secondary {
+  border: 1px solid #bcccdc;
+  background: #ffffff;
+  color: #1f2933;
+}
+
+.button-secondary:disabled {
+  border-color: #e4e7eb;
+  background: #f5f7fa;
+  color: #9aa5b1;
+  cursor: default;
+}
+
+.button-text {
+  min-height: 44px;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button-text:disabled {
+  color: #9aa5b1;
+  cursor: default;
+}
+
+.status-text {
+  margin: 16px 0 0;
+  color: #52606d;
+}
+
+.error-text {
+  margin: 0;
+  color: #b42318;
+  font-size: 14px;
+}
+
+.error-box {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid #f3b8b1;
+  border-radius: 8px;
+  background: #fdecea;
+  color: #7a1c12;
+}
+
+.error-box-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.error-box-detail {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+.text-input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #bcccdc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1f2933;
+  /* 16px 未満だと iOS の Safari が入力時に拡大する */
+  font-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.text-input[aria-invalid='true'] {
+  border-color: #b42318;
+}
+
+.text-input:disabled {
+  background: #f5f7fa;
+  color: #1f2933;
+  -webkit-text-fill-color: #1f2933;
+  opacity: 1;
+}
+
+.section-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+/* ---- 画面の見出し ---- */
+
+.screen-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.screen-title {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.3;
+}
+
+/* ---- ホーム ---- */
+
+.home-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+/* ---- 出題設定 ---- */
+
+.setup {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.field {
+  /* fieldset の既定の min-width（中身の幅）で横にはみ出さないようにする */
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.field-legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-weight: 600;
+}
+
+.options {
+  display: grid;
+  gap: 8px;
+}
+
+.options-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* 選択肢の文字数に合わせた幅で並べる（「年号の範囲」を折り返さない） */
+.options-fit {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.options-fit .option {
+  flex: 1 1 auto;
+  white-space: nowrap;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  font-size: 15px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.option input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #2563eb;
+}
+
+.era-options {
+  margin-top: 12px;
+}
+
+.year-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.year-range-item {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.year-range-label {
+  color: #52606d;
+  font-size: 14px;
+}
+
+.year-range-separator {
+  padding-bottom: 10px;
+}
+
+.hint {
+  flex: 1 0 100%;
+  margin: 0;
+  color: #52606d;
+  font-size: 13px;
+}
+
+.setup-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setup-count {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ---- 出題 ---- */
+
+.quiz-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.progress {
+  margin: 0;
+  color: #52606d;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.quiz {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.question-text {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.question-prompt {
+  margin: 4px 0 12px;
+  color: #52606d;
+}
+
+.year-answer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.year-answer-input {
+  flex: 1 1 auto;
+  font-size: 20px;
+}
+
+.year-answer-unit {
+  flex: 0 0 auto;
+}
+
+.year-answer-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 14px;
+  border: 1px solid #bcccdc;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #1f2933;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+
+.choice:disabled {
+  color: #1f2933;
+  opacity: 1;
+  cursor: default;
+}
+
+.choice.correct {
+  border: 2px solid #15803d;
+  background: #e8f6ec;
+}
+
+.choice.wrong {
+  border: 2px solid #b42318;
+  background: #fdecea;
+}
+
+.choice-title {
+  min-width: 0;
+}
+
+.choice-badge {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.choice.correct .choice-badge {
+  background: #15803d;
+}
+
+.choice.wrong .choice-badge {
+  background: #b42318;
+}
+
+.judgement {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #f5f7fa;
+}
+
+.judgement-mark {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.judgement-mark.correct {
+  color: #15803d;
+}
+
+.judgement-mark.wrong {
+  color: #b42318;
+}
+
+.judgement-detail {
+  margin: 0;
+}
+
+/* ---- まとめ ---- */
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.result-summary {
+  padding: 16px;
+  border: 1px solid #d9e2ec;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.result-score {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-caption {
+  margin: 0;
+  color: #52606d;
+  font-size: 14px;
+}
+
+.result-total {
+  margin: 8px 0 0;
+}
+
+.wrong-list {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid #e4e7eb;
+  list-style: none;
+}
+
+.wrong-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e4e7eb;
+}
+
+.wrong-title {
+  min-width: 0;
+}
+
+.wrong-year {
+  flex: 0 0 auto;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---- 確認ダイアログ（dialog 要素は使わない） ---- */
+
+.dialog-backdrop {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 360px;
+  padding: 20px;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
+}
+
+.dialog-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.dialog-body p {
+  margin: 0;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.dialog-button {
+  flex: 1 1 0;
+  min-width: 0;
+}
