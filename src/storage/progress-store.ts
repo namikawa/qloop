@@ -157,6 +157,9 @@ export class ProgressStore {
    * 1 回答を保存する（設計書 5.4 節）。1 つのトランザクションで、`attempts` への追記、`eventStats` の更新、
    * `sessions` の `answered`・`correct`（最後の問題なら `endedAt` も）の更新、`meta.studyDays` への当日の追加を行う。
    * 完了した後に、メモリ上の状態も同じ内容に更新する。
+   *
+   * 保存先のセッションが無ければ、このストアがメモリに持つ同じセッションを書き戻してから記録する
+   * （別の画面の起動時の掃除で、回答前のセッションが削除されることがあるため）。
    */
   async recordAnswer(input: RecordAnswerInput): Promise<void> {
     const date = this.now();
@@ -167,11 +170,12 @@ export class ProgressStore {
       const statsStore = tx.objectStore('eventStats');
       const sessionStore = tx.objectStore('sessions');
       const metaStore = tx.objectStore('meta');
-      const [previous, session, daysRecord] = await Promise.all([
+      const [previous, stored, daysRecord] = await Promise.all([
         statsStore.get([input.eventId, input.pattern]),
         sessionStore.get(input.sessionId),
         metaStore.get('studyDays'),
       ]);
+      const session = stored ?? this.sessions.get(input.sessionId);
       if (session === undefined) {
         throw new Error(`セッション ${input.sessionId} が見つかりません`);
       }
@@ -218,13 +222,16 @@ export class ProgressStore {
     this.studyDays = [...written.studyDays];
   }
 
-  /** 途中で終了したセッションの `endedAt` を記録する（設計書 6.4 節の 5）。終了済みなら何もしない。 */
+  /**
+   * 途中で終了したセッションの `endedAt` を記録する（設計書 6.4 節の 5）。終了済みなら何もしない。
+   * 保存先のセッションが無ければ、`recordAnswer` と同じくメモリ上のセッションを書き戻す。
+   */
   async endSession(sessionId: string): Promise<void> {
     const endedAt = this.now().toISOString();
     const tx = this.db.transaction('sessions', 'readwrite');
     const session = await inTransaction(tx, async () => {
       const store = tx.objectStore('sessions');
-      const current = await store.get(sessionId);
+      const current = (await store.get(sessionId)) ?? this.sessions.get(sessionId);
       if (current === undefined) {
         throw new Error(`セッション ${sessionId} が見つかりません`);
       }

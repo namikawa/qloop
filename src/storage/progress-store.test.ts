@@ -333,6 +333,42 @@ describe('ProgressStore.endSession', () => {
   });
 });
 
+describe('別の画面の起動で回答前のセッションが削除されたとき', () => {
+  it('recordAnswer はメモリ上のセッションを書き戻してから記録する', async () => {
+    const first = await createStore();
+    const session = await first.store.startSession(NORMAL);
+    // 別の画面（同じデータベースを開く 2 つ目のストア）の起動時の掃除で、回答前のセッションが消える
+    await createStore(first.db);
+    expect(await first.db.get('sessions', session.id)).toBeUndefined();
+
+    advance(1000);
+    await first.store.recordAnswer({
+      sessionId: session.id,
+      eventId: 'demo-0001',
+      pattern: 'choice',
+      correct: true,
+      endSession: false,
+    });
+    const expected = { ...session, answered: 1, correct: 1 };
+    expect(await first.db.get('sessions', session.id)).toEqual(expected);
+    expect(first.store.getSession(session.id)).toEqual(expected);
+    expect(await first.db.count('attempts')).toBe(1);
+  });
+
+  it('endSession はメモリ上のセッションを書き戻して endedAt を記録する', async () => {
+    const first = await createStore();
+    const session = await first.store.startSession(NORMAL);
+    await createStore(first.db);
+    expect(await first.db.get('sessions', session.id)).toBeUndefined();
+
+    advance(1000);
+    await first.store.endSession(session.id);
+    const expected = { ...session, endedAt: '2026-10-11T01:00:01.000Z' };
+    expect(await first.db.get('sessions', session.id)).toEqual(expected);
+    expect(first.store.getSession(session.id)).toEqual(expected);
+  });
+});
+
 describe('ProgressStore.load', () => {
   it('未終了で回答が 0 件のセッションを削除し、中断（回答あり）と終了済みは残す', async () => {
     const first = await createStore();
