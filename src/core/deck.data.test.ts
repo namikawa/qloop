@@ -16,11 +16,10 @@ describe('data/decks/japanese-history', () => {
     expect(result.ok ? [] : result.errors).toEqual([]);
   });
 
-  it('出題対象と誤答用の出来事がある', () => {
+  it('出題対象の出来事がある（誤答用の pool.csv は空でもよい）', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const roles = result.deck.events.map((event) => event.role);
     expect(roles).toContain('core');
-    expect(roles).toContain('pool');
   });
 });
