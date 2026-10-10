@@ -1,0 +1,10 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "qloop",
+  "compatibility_date": "2026-10-11",
+  // 静的アセットの配信だけを行う（Worker のスクリプトは置かない）
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+  },
+}

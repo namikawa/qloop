@@ -1,0 +1,131 @@
+/*
+ * iOS 15.8 の Safari で動く書き方に限る（CSS のネスト、コンテナクエリ、:has()、dialog 要素は使わない）。
+ * 縦向き 375px 幅を基準にし、横スクロールを出さない。
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #ffffff;
+  color: #1f2933;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+button {
+  font: inherit;
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 480px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 16px;
+  padding-top: calc(16px + env(safe-area-inset-top));
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid #f0d58c;
+  border-radius: 8px;
+  background: #fff8e1;
+}
+
+.banner-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+}
+
+.banner-action {
+  flex: 0 0 auto;
+}
+
+.banner-close {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  color: #52606d;
+  font-size: 20px;
+  line-height: 32px;
+  cursor: pointer;
+}
+
+.button {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.home {
+  flex: 1 0 auto;
+}
+
+.app-name {
+  margin: 8px 0 16px;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.deck {
+  padding: 16px;
+  border: 1px solid #d9e2ec;
+  border-radius: 12px;
+}
+
+.deck-name {
+  margin: 0 0 8px;
+  font-size: 20px;
+  line-height: 1.3;
+}
+
+.deck-counts {
+  margin: 0;
+}
+
+.deck-count {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.deck-count dt {
+  color: #52606d;
+}
+
+.deck-count dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.footer {
+  margin-top: 24px;
+  color: #7b8794;
+  font-size: 12px;
+  text-align: center;
+}

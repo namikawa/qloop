@@ -31,7 +31,7 @@
 |---|---|---|
 | 言語 | TypeScript（strict） | 型でデータ形式と状態遷移を固定する |
 | ビルド | Vite | 標準的で設定が少ない。`build.target` を `safari15` にする |
-| UI | React 18（関数コンポーネントと hooks） | もっとも標準的で、実装の委譲先が扱いやすい。画面遷移はアプリ内の状態で持ち、ルーティングライブラリは使わない |
+| UI | React（最新安定版。関数コンポーネントと hooks） | もっとも標準的で、実装の委譲先が扱いやすい。画面遷移はアプリ内の状態で持ち、ルーティングライブラリは使わない |
 | PWA | `vite-plugin-pwa`（Workbox の generateSW） | ビルド成果物と同梱データを事前キャッシュしてオフラインで動かす。更新は `prompt` 方式（6.6 節） |
 | 保存 | IndexedDB（`idb` で Promise 化） | 非同期・大容量・索引付き。レコード単位の追記に向く（5.4 節） |
 | テスト | vitest（`src/core`・`src/storage`）、Playwright の WebKit（主要な画面の通し確認） | ロジックは Node 上で決定的に検証し、画面は Mac 上のヘッドレス WebKit で確認する |
