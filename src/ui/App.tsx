@@ -143,6 +143,7 @@ export function App() {
       onCloseInstallBanner={() => setInstallBannerVisible(false)}
       updateAvailable={update.available}
       onApplyUpdate={update.apply}
+      onCheckUpdate={update.check}
     />
   );
 }

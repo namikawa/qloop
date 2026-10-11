@@ -25,6 +25,10 @@ test('ホーム画面に教材名・件数・版が表示され、横スクロ�
   );
   await expect(page.getByText('誤答用')).toHaveCount(0);
   await expect(page.getByTestId('version')).toHaveText(`バージョン ${version}`);
+  // 版の表示の横に「アプリを更新」があり、押せる部分の高さは 44px 以上
+  const updateButton = page.getByRole('button', { name: 'アプリを更新', exact: true });
+  await expect(updateButton).toBeEnabled();
+  expect((await updateButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
   // 学習の記録を読み込んだら「出題」「復習」「成績」を押せる
   await expect(page.getByRole('button', { name: '出題', exact: true })).toBeEnabled();
   await expect(page.getByRole('button', { name: '復習', exact: true })).toBeEnabled();

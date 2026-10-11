@@ -2,11 +2,17 @@
 
 1 問 1 答で勉強する PWA（ホーム画面に追加して使う Web アプリ）。最初の教材は日本史の年表。
 
+- 公開 URL: https://qloop.na3.workers.dev
 - iPhone の Safari で URL を開き、共有メニューの「ホーム画面に追加」で導入する。
 - 学習の記録は端末の中だけに保存する（ログインや端末間の同期はしない）。
 - 配信は Cloudflare Workers の静的アセット配信。
 
-設計は [`docs/design.md`](docs/design.md) を参照。
+## ドキュメント
+
+- [`docs/design.md`](docs/design.md): 設計書（要件、データ形式、出題・復習・成績の仕様、配布）
+- [`docs/data.md`](docs/data.md): 年表データの手引き（年号の正誤の基準、列の使い分け、データを足す手順）
+- [`docs/operations.md`](docs/operations.md): 運用手順（デプロイ、端末への導入、更新、成績のバックアップ、動作確認）
+- [`docs/visual-design.md`](docs/visual-design.md): 見た目のデザインの前提と制約（ロゴ・アイコン・配色を見直すときに渡す）
 
 ## 前提
 
@@ -31,9 +37,13 @@
 ## データ
 
 - 教材データは `data/decks/japanese-history/` の `core.csv`（基本の年表）と `pool.csv`（追加データ）。
-- 列の形式と検証の規則は `docs/design.md` の 5 章を参照。
+- 年表データの「正しさ」は、歴史的な史実ではなく、現代の中学受験・高校受験で出題される問題での正解とする。基準の詳細とデータを足す手順は `docs/data.md`、列の形式と検証の規則は `docs/design.md` の 5 章を参照。
 
 ## デプロイ
 
-- `npm run deploy` を実行する。
-- 初回だけ `npx wrangler login` で Cloudflare にログインしておく。
+- `npm run deploy` を実行する。初回だけ `npx wrangler login` で Cloudflare にログインしておく。
+- 手順の詳細と配信後の確認は `docs/operations.md` の 2 章を参照。
+
+## ライセンス
+
+[MIT ライセンス](LICENSE)。コードと年表データ（`data/`）の両方が対象。
