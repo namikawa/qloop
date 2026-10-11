@@ -17,7 +17,7 @@ export default defineConfig({
       registerType: 'prompt',
       injectRegister: 'auto',
       strategies: 'generateSW',
-      includeAssets: ['apple-touch-icon.png'],
+      includeAssets: ['apple-touch-icon.png', 'qloop-logo.svg'],
       manifest: {
         name: 'QLoop',
         short_name: 'QLoop',
@@ -25,8 +25,8 @@ export default defineConfig({
         display: 'standalone',
         start_url: '/',
         scope: '/',
-        theme_color: '#ffffff',
-        background_color: '#ffffff',
+        theme_color: '#f5f2eb',
+        background_color: '#f5f2eb',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { ERAS } from '../../core/era';
 import type {
   Era,
@@ -15,6 +15,10 @@ import { eligibleQuestions, filterByScope, generateSession } from '../../core/qu
 import { filterByRange, parseRangeYear, validateRange } from '../../core/range';
 import { PATTERN_LABELS } from '../../core/stats';
 import type { ProgressStore } from '../../storage/progress-store';
+import { BottomBar } from '../components/BottomBar';
+import { CheckCircleIcon, CheckIcon } from '../components/icons';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { Segmented } from '../components/Segmented';
 
 /**
  * 保存した設定が無いときの初期値（設計書 6.1 節）。出題する出来事は塾が推奨する基本の年表のみ、問題数は 10。
@@ -31,10 +35,22 @@ const SCOPE_OPTIONS: { value: EventScope; label: string }[] = [
   { value: 'all', label: 'すべて' },
 ];
 
+/** 出題パターンの説明。 */
+const PATTERN_DESCRIPTIONS: Readonly<Record<PatternMode, string>> = {
+  yearInput: '年を数字で入れる',
+  yearChoice: '4 つの年から選ぶ',
+  choice: '4 つの出来事から選ぶ',
+  mixed: '3 つの形式をまぜる',
+};
+
 /** 出題パターンの選択肢（年号入力・年号 4 択・出来事 4 択・ミックスの順。表示名は `PATTERN_LABELS`）。 */
-const PATTERN_OPTIONS: { value: PatternMode; label: string }[] = (
+const PATTERN_OPTIONS: { value: PatternMode; label: string; description: string }[] = (
   ['yearInput', 'yearChoice', 'choice', 'mixed'] as const
-).map((value) => ({ value, label: PATTERN_LABELS[value] }));
+).map((value) => ({
+  value,
+  label: PATTERN_LABELS[value],
+  description: PATTERN_DESCRIPTIONS[value],
+}));
 
 /** 問題数の選択肢（出題設定と復習で共通）。 */
 export const COUNT_OPTIONS: { value: QuestionCount; label: string }[] = [
@@ -153,149 +169,105 @@ export function QuizSetup({ store, population, allEvents, onStart, onBack }: Qui
   };
 
   return (
-    <div className="screen">
-      <header className="screen-header">
-        <button type="button" className="button-text" onClick={onBack}>
-          ‹ 戻る
-        </button>
-        <h1 className="screen-title">出題設定</h1>
-      </header>
+    <div className="screen screen-with-bar">
+      <ScreenHeader title="出題設定" onBack={onBack} />
 
-      <main className="setup">
-        <fieldset className="field">
-          <legend className="field-legend">出題する出来事</legend>
-          <div className="options options-2">
-            {SCOPE_OPTIONS.map((option) => (
-              <label key={option.value} className="option">
-                <input
-                  type="radio"
-                  name="scope"
-                  checked={scope === option.value}
-                  onChange={() => setScope(option.value)}
-                />
-                <span>{option.label}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+      <main className="setup screen-body">
+        <Segmented
+          legend="出題する出来事"
+          name="scope"
+          options={SCOPE_OPTIONS}
+          value={scope}
+          onChange={setScope}
+        />
 
-        <fieldset className="field">
-          <legend className="field-legend">出題パターン</legend>
-          <div className="options options-2">
-            {PATTERN_OPTIONS.map((option) => (
-              <label key={option.value} className="option">
-                <input
-                  type="radio"
-                  name="pattern"
-                  checked={pattern === option.value}
-                  onChange={() => setPattern(option.value)}
-                />
-                <span>{option.label}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        <PatternField value={pattern} onChange={setPattern} />
 
-        <fieldset className="field">
-          <legend className="field-legend">問題数</legend>
-          <div className="options options-3">
-            {COUNT_OPTIONS.map((option) => (
-              <label key={option.value} className="option">
-                <input
-                  type="radio"
-                  name="count"
-                  checked={count === option.value}
-                  onChange={() => setCount(option.value)}
-                />
-                <span>{option.label}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        <Segmented
+          legend="問題数"
+          name="count"
+          options={COUNT_OPTIONS}
+          value={count}
+          onChange={setCount}
+        />
 
-        <fieldset className="field">
-          <legend className="field-legend">範囲</legend>
-          <div className="options options-fit">
-            {RANGE_OPTIONS.map((option) => (
-              <label key={option.value} className="option">
-                <input
-                  type="radio"
-                  name="range"
-                  checked={rangeKind === option.value}
-                  onChange={() => setRangeKind(option.value)}
-                />
-                <span>{option.label}</span>
-              </label>
-            ))}
-          </div>
+        <div>
+          <Segmented
+            legend="範囲"
+            name="range"
+            options={RANGE_OPTIONS}
+            value={rangeKind}
+            onChange={setRangeKind}
+          />
 
           {rangeKind === 'years' && (
-            <div className="year-range">
-              <label className="year-range-item">
-                <span className="year-range-label">開始年</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  autoComplete="off"
-                  className="text-input"
+            <>
+              <div className="year-range">
+                <YearRangeInput
+                  label="開始年"
                   value={fromText}
-                  aria-invalid={from === undefined}
-                  onChange={(event) => setFromText(event.target.value)}
+                  invalid={from === undefined}
+                  onChange={setFromText}
                 />
-              </label>
-              <span className="year-range-separator" aria-hidden="true">
-                〜
-              </span>
-              <label className="year-range-item">
-                <span className="year-range-label">終了年</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  autoComplete="off"
-                  className="text-input"
+                <span className="year-range-separator" aria-hidden="true">
+                  〜
+                </span>
+                <YearRangeInput
+                  label="終了年"
                   value={toText}
-                  aria-invalid={to === undefined}
-                  onChange={(event) => setToText(event.target.value)}
+                  invalid={to === undefined}
+                  onChange={setToText}
                 />
-              </label>
+              </div>
               <p className="hint">
                 空欄の側は制限なし。紀元前の出来事は開始年が空欄のときだけ含みます。
               </p>
-            </div>
+            </>
           )}
 
           {rangeKind === 'eras' && (
-            <div className="options options-3 era-options">
-              {ERAS.map(({ name }) => (
-                <label key={name} className="option">
-                  <input
-                    type="checkbox"
-                    checked={eras.has(name)}
-                    onChange={() => toggleEra(name)}
-                  />
-                  <span>{name}</span>
-                </label>
-              ))}
-            </div>
+            <fieldset className="field">
+              <legend className="visually-hidden">時代</legend>
+              <div className="chip-options">
+                {ERAS.map(({ name }) => (
+                  <label key={name} className="chip">
+                    <input
+                      type="checkbox"
+                      className="overlay-input"
+                      checked={eras.has(name)}
+                      onChange={() => toggleEra(name)}
+                    />
+                    <span className="chip-label">
+                      <CheckIcon className="chip-check" />
+                      {name}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
           )}
-        </fieldset>
+        </div>
+      </main>
 
-        <div className="setup-footer">
+      <BottomBar>
+        {problem !== null && (
+          <p className="error-text" role="alert">
+            {problem}
+          </p>
+        )}
+        {startError !== null && (
+          <p className="error-text" role="alert">
+            {startError}
+          </p>
+        )}
+        <div className="start-row">
           {eligibleCount !== null && (
-            <p className="setup-count" data-testid="eligible-count">
-              対象 {eligibleCount} 件
-            </p>
-          )}
-          {problem !== null && (
-            <p className="error-text" role="alert">
-              {problem}
-            </p>
-          )}
-          {startError !== null && (
-            <p className="error-text" role="alert">
-              {startError}
+            <p className="target-count" data-testid="eligible-count">
+              <span className="target-label">対象</span>{' '}
+              <span>
+                <span className="target-number">{eligibleCount}</span>
+                <span className="target-unit"> 件</span>
+              </span>
             </p>
           )}
           <button
@@ -307,7 +279,87 @@ export function QuizSetup({ store, population, allEvents, onStart, onBack }: Qui
             開始
           </button>
         </div>
-      </main>
+      </BottomBar>
+    </div>
+  );
+}
+
+interface PatternFieldProps {
+  value: PatternMode;
+  onChange: (value: PatternMode) => void;
+}
+
+/**
+ * 出題パターンの選択（2 列のカード）。ラジオボタンの名前はパターン名だけにし、説明は aria-describedby で添える。
+ */
+function PatternField({ value, onChange }: PatternFieldProps) {
+  const idPrefix = useId();
+  return (
+    <fieldset className="field">
+      <legend className="field-legend">出題パターン</legend>
+      <div className="pattern-options">
+        {PATTERN_OPTIONS.map((option) => {
+          const inputId = `${idPrefix}-${option.value}`;
+          const descriptionId = `${inputId}-description`;
+          return (
+            <div key={option.value} className="pattern-option">
+              <input
+                id={inputId}
+                type="radio"
+                className="overlay-input"
+                name="pattern"
+                checked={value === option.value}
+                aria-describedby={descriptionId}
+                onChange={() => onChange(option.value)}
+              />
+              <div className="pattern-card">
+                <label htmlFor={inputId} className="pattern-name">
+                  {option.label}
+                </label>
+                <span id={descriptionId} className="pattern-desc">
+                  {option.description}
+                </span>
+                <CheckCircleIcon className="pattern-check" />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+interface YearRangeInputProps {
+  label: string;
+  value: string;
+  invalid: boolean;
+  onChange: (value: string) => void;
+}
+
+/** 年号の範囲の入力欄（欄の右端の中に「年」を置く）。 */
+function YearRangeInput({ label, value, invalid, onChange }: YearRangeInputProps) {
+  const inputId = useId();
+  return (
+    <div className="year-range-item">
+      <label htmlFor={inputId} className="year-range-caption">
+        {label}
+      </label>
+      <div className={invalid ? 'input-box is-invalid' : 'input-box'}>
+        <input
+          id={inputId}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          autoComplete="off"
+          className="input-box-input"
+          value={value}
+          aria-invalid={invalid}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <span className="input-box-unit" aria-hidden="true">
+          年
+        </span>
+      </div>
     </div>
   );
 }

@@ -1,21 +1,25 @@
 import { useRef, useState } from 'react';
 import type { Event, Pattern, Question, Session } from '../../core/models';
+import { answeredRatio, progressSteps, type AnswerOutcome } from '../../core/progress';
 import { isCorrectYear } from '../../core/quiz';
 import {
   formatAnswerYears,
   formatEventYear,
-  formatYear,
   normalizeYearInput,
+  splitYearText,
 } from '../../core/year';
 import type { ProgressStore } from '../../storage/progress-store';
-import { Banner } from '../components/Banner';
+import { Banner, BannerCloseButton } from '../components/Banner';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { AnswerMarkIcon, JudgementIcon } from '../components/icons';
+import { ProgressSteps, ProgressTrack } from '../components/ProgressSteps';
 
 /** 回答した 1 問（まとめ画面に渡す）。 */
 export interface AnsweredQuestion {
   event: Event;
   pattern: Pattern;
-  correct: boolean;
+  /** 判定。「わからない」は記録では不正解だが、進み具合の区切りでは分けて示す。 */
+  outcome: AnswerOutcome;
 }
 
 /** 1 セッションの結果（まとめ画面に渡す）。 */
@@ -37,13 +41,19 @@ interface Judgement {
   gaveUp: boolean;
 }
 
-/** 判定欄の見出し（正解・不正解・わからない）と、その色のクラス。 */
-function judgementMark({ correct, gaveUp }: Judgement): { text: string; className: string } {
+function outcomeOf({ correct, gaveUp }: Judgement): AnswerOutcome {
   if (gaveUp) {
-    return { text: 'わからない', className: 'gave-up' };
+    return 'gaveUp';
   }
-  return correct ? { text: '正解', className: 'correct' } : { text: '不正解', className: 'wrong' };
+  return correct ? 'correct' : 'wrong';
 }
+
+/** 判定の帯の見出し（正解・不正解・わからない）と、その色のクラス。 */
+const JUDGEMENT_MARKS: Readonly<Record<AnswerOutcome, { text: string; className: string }>> = {
+  correct: { text: '正解', className: 'correct' },
+  wrong: { text: '不正解', className: 'wrong' },
+  gaveUp: { text: 'わからない', className: 'gave-up' },
+};
 
 interface QuizProps {
   store: ProgressStore;
@@ -72,6 +82,12 @@ export function Quiz({ store, session, questions, onFinish }: QuizProps) {
   const question = questions[index];
   const isLast = index === questions.length - 1;
   const finished = isLast && judgement !== null;
+  const outcome = judgement === null ? null : outcomeOf(judgement);
+  const steps = progressSteps(
+    questions.length,
+    answers.map((answered) => answered.outcome),
+    index,
+  );
 
   const answer = async (correct: boolean, chosen: string | number | null, gaveUp = false) => {
     if (judgement !== null || busyRef.current) {
@@ -97,11 +113,12 @@ export function Quiz({ store, session, questions, onFinish }: QuizProps) {
     }
     busyRef.current = false;
     setSaving(false);
+    const next: Judgement = { correct, chosen, gaveUp };
     setAnswers((previous) => [
       ...previous,
-      { event: question.event, pattern: question.pattern, correct },
+      { event: question.event, pattern: question.pattern, outcome: outcomeOf(next) },
     ]);
-    setJudgement({ correct, chosen, gaveUp });
+    setJudgement(next);
   };
 
   // 「わからない」は不正解として記録し、答えを見せる（設計書 6.2・6.3・6.7 節）
@@ -133,14 +150,19 @@ export function Quiz({ store, session, questions, onFinish }: QuizProps) {
   };
 
   return (
-    <div className="screen">
+    <div className="screen screen-with-bar">
       <header className="quiz-header">
         <p className="progress" data-testid="progress">
           {index + 1} / {questions.length}
         </p>
+        {steps === null ? (
+          <ProgressTrack ratio={answeredRatio(questions.length, answers.length)} />
+        ) : (
+          <ProgressSteps steps={steps} />
+        )}
         <button
           type="button"
-          className="button-text"
+          className="button-text quiz-end"
           disabled={saving || ending || finished}
           onClick={() => setConfirmingEnd(true)}
         >
@@ -149,27 +171,16 @@ export function Quiz({ store, session, questions, onFinish }: QuizProps) {
       </header>
 
       {saveErrorVisible && (
-        <Banner
-          action={
-            <button
-              type="button"
-              className="banner-close"
-              aria-label="閉じる"
-              onClick={() => setSaveErrorVisible(false)}
-            >
-              ×
-            </button>
-          }
-        >
+        <Banner action={<BannerCloseButton onClick={() => setSaveErrorVisible(false)} />}>
           保存に失敗しました（学習は続けられます）
         </Banner>
       )}
 
-      <main className="quiz" key={index}>
+      <main className="quiz screen-body" key={index}>
         {question.pattern === 'yearInput' && (
           <YearInputQuestion
             event={question.event}
-            answered={judgement !== null}
+            outcome={outcome}
             disabled={saving || ending}
             onAnswer={(year) => void answer(isCorrectYear(question.event, year), null)}
             onGiveUp={giveUp}
@@ -195,30 +206,38 @@ export function Quiz({ store, session, questions, onFinish }: QuizProps) {
             onGiveUp={giveUp}
           />
         )}
+      </main>
 
-        {judgement !== null && (
-          <section className="judgement" aria-live="polite">
-            <p
-              className={`judgement-mark ${judgementMark(judgement).className}`}
-              data-testid="judgement"
-            >
-              {judgementMark(judgement).text}
-            </p>
-            {question.pattern !== 'choice' && (
-              <p className="judgement-detail">正解の年: {formatAnswerYears(question.event)}</p>
-            )}
+      {outcome !== null && (
+        <section
+          className={`bottom-bar judgement-bar ${JUDGEMENT_MARKS[outcome].className}`}
+          aria-live="polite"
+        >
+          <div className="judgement-row">
+            <div className="judgement-main">
+              <p className="judgement-mark" data-testid="judgement">
+                <JudgementIcon kind={outcome} />
+                {JUDGEMENT_MARKS[outcome].text}
+              </p>
+              {question.pattern !== 'choice' && (
+                <p className="judgement-detail">
+                  正解の年{' '}
+                  <span className="judgement-years">{formatAnswerYears(question.event)}</span>
+                </p>
+              )}
+            </div>
             <button
               type="button"
-              className="button-primary"
+              className="button-primary judgement-next"
               disabled={ending}
               autoFocus
               onClick={goNext}
             >
               {finished ? '結果を見る' : '次へ'}
             </button>
-          </section>
-        )}
-      </main>
+          </div>
+        </section>
+      )}
 
       {confirmingEnd && (
         <ConfirmDialog
@@ -251,9 +270,26 @@ function GiveUpButton({ disabled, onClick }: GiveUpButtonProps) {
   );
 }
 
+/** 年号入力と年号 4 択の問題（「何年の出来事？」と出来事の文）。 */
+function QuestionCard({ event }: { event: Event }) {
+  return (
+    <div className="card question-card">
+      <p className="question-prompt">何年の出来事？</p>
+      <p className="question-text">{event.title}</p>
+    </div>
+  );
+}
+
+const YEAR_FIELD_CLASSES: Readonly<Record<AnswerOutcome, string>> = {
+  correct: 'year-field is-correct',
+  wrong: 'year-field is-wrong',
+  gaveUp: 'year-field is-gaveup',
+};
+
 interface YearInputQuestionProps {
   event: Event;
-  answered: boolean;
+  /** 判定。回答前は `null`。 */
+  outcome: AnswerOutcome | null;
   disabled: boolean;
   onAnswer: (year: number) => void;
   onGiveUp: () => void;
@@ -262,13 +298,14 @@ interface YearInputQuestionProps {
 /** パターン A: 年号入力（設計書 6.2 節）。 */
 function YearInputQuestion({
   event,
-  answered,
+  outcome,
   disabled,
   onAnswer,
   onGiveUp,
 }: YearInputQuestionProps) {
   const [text, setText] = useState('');
   const year = normalizeYearInput(text);
+  const answered = outcome !== null;
   const locked = answered || disabled;
 
   return (
@@ -283,22 +320,28 @@ function YearInputQuestion({
         }
       }}
     >
-      <p className="question-text">{event.title}</p>
-      <p className="question-prompt">何年の出来事？</p>
+      <QuestionCard event={event} />
       <div className="year-answer">
-        <input
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          autoComplete="off"
-          className="text-input year-answer-input"
-          aria-label="年号"
-          value={text}
-          disabled={locked}
-          autoFocus
-          onChange={(changeEvent) => setText(changeEvent.target.value)}
-        />
-        <span className="year-answer-unit">年</span>
+        <div className={outcome === null ? 'year-field' : YEAR_FIELD_CLASSES[outcome]}>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            autoComplete="off"
+            className="input-box-input year-field-input"
+            aria-label="年号"
+            value={outcome === 'gaveUp' ? '' : text}
+            disabled={locked}
+            autoFocus
+            onChange={(changeEvent) => setText(changeEvent.target.value)}
+          />
+          <span className="year-field-unit" aria-hidden="true">
+            {(outcome === 'correct' || outcome === 'wrong') && (
+              <AnswerMarkIcon className={`year-field-mark ${outcome}`} kind={outcome} />
+            )}
+            年
+          </span>
+        </div>
         <button
           type="submit"
           className="button-primary year-answer-button"
@@ -310,6 +353,25 @@ function YearInputQuestion({
       {!answered && <GiveUpButton disabled={disabled} onClick={onGiveUp} />}
     </form>
   );
+}
+
+/** 判定の後の選択肢のクラスと札（正解・選んだ誤答・残り）。 */
+function settledChoice(
+  judgement: Judgement | null,
+  isAnswer: boolean,
+  isChosen: boolean,
+  baseClass: string,
+): { className: string; badge: string | null } {
+  if (judgement === null) {
+    return { className: baseClass, badge: null };
+  }
+  if (isAnswer) {
+    return { className: `${baseClass} settled correct`, badge: '◯ 正解' };
+  }
+  if (!judgement.correct && isChosen) {
+    return { className: `${baseClass} settled wrong`, badge: '✕ 選んだ答え' };
+  }
+  return { className: `${baseClass} settled`, badge: null };
 }
 
 interface YearChoiceQuestionProps {
@@ -333,20 +395,15 @@ function YearChoiceQuestion({
 }: YearChoiceQuestionProps) {
   return (
     <div className="question">
-      <p className="question-text">{event.title}</p>
-      <p className="question-prompt">何年の出来事？</p>
+      <QuestionCard event={event} />
       <ul className="year-choices">
         {years.map((year) => {
-          const isAnswer = judgement !== null && year === event.year;
-          const isWrongPick = judgement !== null && !judgement.correct && year === judgement.chosen;
-          const className = [
-            'choice',
-            'year-choice',
-            isAnswer ? 'correct' : '',
-            isWrongPick ? 'wrong' : '',
-          ]
-            .filter(Boolean)
-            .join(' ');
+          const { className, badge } = settledChoice(
+            judgement,
+            year === event.year,
+            year === judgement?.chosen,
+            'choice year-choice',
+          );
           return (
             <li key={year}>
               <button
@@ -356,9 +413,11 @@ function YearChoiceQuestion({
                 disabled={judgement !== null || disabled}
                 onClick={() => onAnswer(year)}
               >
-                <span className="year-choice-year">{formatYear(year)}</span>
-                {isAnswer && <span className="choice-badge">正解</span>}
-                {isWrongPick && <span className="choice-badge">選んだ答え</span>}
+                <span className="year-choice-year">
+                  {year}
+                  <span className="year-choice-unit">年</span>
+                </span>
+                {badge !== null && <span className="choice-badge">{badge}</span>}
               </button>
             </li>
           );
@@ -378,7 +437,7 @@ interface ChoiceQuestionProps {
   onGiveUp: () => void;
 }
 
-/** パターン B: 出来事 4 択（設計書 6.3 節）。 */
+/** パターン B: 出来事 4 択（設計書 6.3 節）。問いの年の数字を大きく見せる。 */
 function ChoiceQuestion({
   event,
   choices,
@@ -387,17 +446,23 @@ function ChoiceQuestion({
   onAnswer,
   onGiveUp,
 }: ChoiceQuestionProps) {
+  const year = splitYearText(formatEventYear(event));
   return (
     <div className="question">
-      <p className="question-text">{formatEventYear(event)}の出来事は？</p>
+      <p className="question-text choice-question">
+        {year.prefix !== '' && <span className="choice-question-unit">{year.prefix}</span>}
+        {year.number !== '' && <span className="choice-question-number">{year.number}</span>}
+        {year.suffix !== '' && <span className="choice-question-unit">{year.suffix}</span>}
+        <span className="choice-question-rest">の出来事は？</span>
+      </p>
       <ul className="choices">
         {choices.map((choice) => {
-          const isAnswer = judgement !== null && choice.id === event.id;
-          const isWrongPick =
-            judgement !== null && !judgement.correct && choice.id === judgement.chosen;
-          const className = ['choice', isAnswer ? 'correct' : '', isWrongPick ? 'wrong' : '']
-            .filter(Boolean)
-            .join(' ');
+          const { className, badge } = settledChoice(
+            judgement,
+            choice.id === event.id,
+            choice.id === judgement?.chosen,
+            'choice',
+          );
           return (
             <li key={choice.id}>
               <button
@@ -408,8 +473,7 @@ function ChoiceQuestion({
                 onClick={() => onAnswer(choice)}
               >
                 <span className="choice-title">{choice.title}</span>
-                {isAnswer && <span className="choice-badge">正解</span>}
-                {isWrongPick && <span className="choice-badge">選んだ答え</span>}
+                {badge !== null && <span className="choice-badge">{badge}</span>}
               </button>
             </li>
           );

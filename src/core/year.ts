@@ -40,3 +40,25 @@ export function normalizeYearInput(text: string): number | null {
     .replace(FULLWIDTH_DIGIT, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xfee0));
   return YEAR_INPUT.test(halfWidth) ? Number(halfWidth) : null;
 }
+
+/** 年の表示を分けたもの。`number` は大きく見せる数字（無ければ空）、`prefix`・`suffix` はその前後。 */
+export interface YearTextParts {
+  prefix: string;
+  number: string;
+  suffix: string;
+}
+
+const YEAR_TEXT = /^(\D*)(\d+)(.*)$/;
+
+/**
+ * 年の表示（`formatEventYear` の結果）を、最初の数字の並びとその前後に分ける。出来事 4 択の問いで数字だけを
+ * 大きく見せるのに使う。例: `1467年` → `''`・`1467`・`年`、`紀元前57年ごろ` → `紀元前`・`57`・`年ごろ`。
+ * 数字が無ければ全体を `prefix` にする。
+ */
+export function splitYearText(text: string): YearTextParts {
+  const match = YEAR_TEXT.exec(text);
+  if (match === null) {
+    return { prefix: text, number: '', suffix: '' };
+  }
+  return { prefix: match[1], number: match[2], suffix: match[3] };
+}

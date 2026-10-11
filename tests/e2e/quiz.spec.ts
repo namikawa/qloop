@@ -147,7 +147,7 @@ test('年号入力で正解と不正解を 1 問ずつ答えて終了すると�
   await input.fill('９９９９');
   await answerButton.click();
   await expect(page.getByTestId('judgement')).toHaveText('不正解');
-  await expect(page.getByText(/^正解の年: /)).toBeVisible();
+  await expect(page.getByText(/^正解の年 /)).toBeVisible();
 
   // 終了 → 確認 → 結果
   await page.getByRole('button', { name: '終了', exact: true }).click();
@@ -264,7 +264,7 @@ test('年号入力で「わからない」を押すと、不正解として記�
   await page.getByRole('button', { name: 'わからない' }).click();
 
   await expect(page.getByTestId('judgement')).toHaveText('わからない');
-  await expect(page.getByText(/^正解の年: /)).toContainText(`${event?.year}年`);
+  await expect(page.getByText(/^正解の年 /)).toContainText(`${event?.year}年`);
   await expect(page.getByRole('textbox', { name: '年号' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'わからない' })).toHaveCount(0);
   await page.getByRole('button', { name: '次へ' }).click();
@@ -284,7 +284,7 @@ test('年号入力で「わからない」を押すと、不正解として記�
   // 復習の候補にもなる
   await page.getByRole('button', { name: 'ホームへ' }).click();
   await page.getByRole('button', { name: '復習', exact: true }).click();
-  await expect(page.getByTestId('review-count')).toHaveText('復習する問題は 1 件');
+  await expect(page.getByTestId('review-count')).toHaveText('1 件');
 });
 
 test('出来事 4 択で「わからない」を押すと、正解の選択肢を示して先へ進める', async ({ page }) => {
@@ -357,7 +357,7 @@ test('年号 4 択で正解・不正解・「わからない」を 1 問ずつ�
   const first = await currentQuestion();
   await yearButton(first.year).click();
   await expect(page.getByTestId('judgement')).toHaveText('正解');
-  await expect(page.getByText(/^正解の年: /)).toContainText(`${first.year}年`);
+  await expect(page.getByText(/^正解の年 /)).toContainText(`${first.year}年`);
   await expect(page.locator('.choice.correct')).toHaveCount(1);
   await expect(page.locator('.choice.correct')).toContainText(`${first.year}年`);
   await expect(page.locator('.choice.wrong')).toHaveCount(0);
@@ -371,7 +371,7 @@ test('年号 4 択で正解・不正解・「わからない」を 1 問ずつ�
   const wrongYear = second.years.find((year) => year !== second.year) ?? NaN;
   await yearButton(wrongYear).click();
   await expect(page.getByTestId('judgement')).toHaveText('不正解');
-  await expect(page.getByText(/^正解の年: /)).toContainText(`${second.year}年`);
+  await expect(page.getByText(/^正解の年 /)).toContainText(`${second.year}年`);
   await expect(page.locator('.choice.correct')).toContainText(`${second.year}年`);
   await expect(page.locator('.choice.wrong')).toHaveCount(1);
   await expect(page.locator('.choice.wrong')).toContainText(`${wrongYear}年`);
@@ -385,7 +385,7 @@ test('年号 4 択で正解・不正解・「わからない」を 1 問ずつ�
   const third = await currentQuestion();
   await page.getByRole('button', { name: 'わからない' }).click();
   await expect(page.getByTestId('judgement')).toHaveText('わからない');
-  await expect(page.getByText(/^正解の年: /)).toContainText(`${third.year}年`);
+  await expect(page.getByText(/^正解の年 /)).toContainText(`${third.year}年`);
   await expect(page.locator('.choice.correct')).toContainText(`${third.year}年`);
   await expect(page.locator('.choice.wrong')).toHaveCount(0);
   await expectLocked();

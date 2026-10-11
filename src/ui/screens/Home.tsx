@@ -1,6 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { UpdateCheckCallbacks, UpdateCheckResult } from '../../pwa/update-check';
-import { Banner } from '../components/Banner';
+import { Banner, BannerCloseButton } from '../components/Banner';
+import {
+  ChevronRightIcon,
+  ReviewIcon,
+  ShareIcon,
+  StatsIcon,
+  UpdateIcon,
+} from '../components/icons';
 
 /** 学習の記録（IndexedDB）の準備の状態。 */
 export type StoreStatus =
@@ -14,6 +21,10 @@ interface HomeProps {
   coreCount: number;
   version: string;
   storeStatus: StoreStatus;
+  /** 連続学習日数。学習の記録の準備ができるまでは `null`（行を出さない）。 */
+  streakDays: number | null;
+  /** 復習する問題の件数（復習の画面と同じ数え方）。準備ができるまでは `null`。0 件なら札を出さない。 */
+  reviewCount: number | null;
   onStartQuiz: () => void;
   onStartReview: () => void;
   onOpenStats: () => void;
@@ -105,6 +116,8 @@ export function Home({
   coreCount,
   version,
   storeStatus,
+  streakDays,
+  reviewCount,
   onStartQuiz,
   onStartReview,
   onOpenStats,
@@ -114,28 +127,23 @@ export function Home({
   onApplyUpdate,
   onCheckUpdate,
 }: HomeProps) {
+  const ready = storeStatus.status === 'ready';
+  const reviewLabelId = useId();
+  const reviewBadgeId = useId();
+  const showReviewBadge = ready && reviewCount !== null && reviewCount > 0;
+
   return (
-    <div className="screen">
+    <div className="screen home-screen">
       {installBannerVisible && (
-        <Banner
-          action={
-            <button
-              type="button"
-              className="banner-close"
-              aria-label="閉じる"
-              onClick={onCloseInstallBanner}
-            >
-              ×
-            </button>
-          }
-        >
+        <Banner icon={<ShareIcon />} action={<BannerCloseButton onClick={onCloseInstallBanner} />}>
           Safari の共有メニューから『ホーム画面に追加』して使ってください
         </Banner>
       )}
       {updateAvailable && (
         <Banner
+          icon={<UpdateIcon />}
           action={
-            <button type="button" className="button" onClick={onApplyUpdate}>
+            <button type="button" className="banner-button" onClick={onApplyUpdate}>
               更新
             </button>
           }
@@ -145,8 +153,10 @@ export function Home({
       )}
 
       <main className="home">
-        <h1 className="app-name">QLoop</h1>
-        <section className="deck" aria-labelledby="deck-name">
+        <h1 className="home-logo">
+          <img src="/qloop-logo.svg" alt="QLoop" width={112} height={36} />
+        </h1>
+        <section className="card deck" aria-labelledby="deck-name">
           <h2 id="deck-name" className="deck-name">
             {deckName}
           </h2>
@@ -155,6 +165,12 @@ export function Home({
             <span className="nowrap">出題できる出来事 {targetCount} 件</span>
             <span className="nowrap">（基本の年表 {coreCount} 件）</span>
           </p>
+          {ready && streakDays !== null && (
+            <p className="streak" data-testid="home-streak">
+              連続学習日数 <span className="streak-number">{streakDays}</span>{' '}
+              <span className="streak-unit">日</span>
+            </p>
+          )}
         </section>
 
         {storeStatus.status === 'loading' && (
@@ -169,30 +185,38 @@ export function Home({
           </div>
         )}
 
-        <div className="home-actions">
+        <button
+          type="button"
+          className="button-primary home-start"
+          disabled={!ready}
+          onClick={onStartQuiz}
+        >
+          出題
+        </button>
+        <div className="card card-flat menu">
           <button
             type="button"
-            className="button-primary"
-            disabled={storeStatus.status !== 'ready'}
-            onClick={onStartQuiz}
-          >
-            出題
-          </button>
-          <button
-            type="button"
-            className="button-secondary"
-            disabled={storeStatus.status !== 'ready'}
+            className="menu-row"
+            disabled={!ready}
+            aria-labelledby={reviewLabelId}
+            aria-describedby={showReviewBadge ? reviewBadgeId : undefined}
             onClick={onStartReview}
           >
-            復習
+            <ReviewIcon className="menu-icon" />
+            <span id={reviewLabelId} className="menu-label">
+              復習
+            </span>
+            {showReviewBadge && (
+              <span id={reviewBadgeId} className="menu-badge" data-testid="home-review-count">
+                {reviewCount} 件
+              </span>
+            )}
+            <ChevronRightIcon className="menu-chevron" />
           </button>
-          <button
-            type="button"
-            className="button-secondary"
-            disabled={storeStatus.status !== 'ready'}
-            onClick={onOpenStats}
-          >
-            成績
+          <button type="button" className="menu-row" disabled={!ready} onClick={onOpenStats}>
+            <StatsIcon className="menu-icon" />
+            <span className="menu-label">成績</span>
+            <ChevronRightIcon className="menu-chevron" />
           </button>
         </div>
       </main>

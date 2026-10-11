@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatAnswerYears, formatEventYear, formatYear, normalizeYearInput } from './year';
+import {
+  formatAnswerYears,
+  formatEventYear,
+  formatYear,
+  normalizeYearInput,
+  splitYearText,
+} from './year';
 
 describe('formatEventYear', () => {
   it('通常の年は「○○年」', () => {
@@ -92,5 +98,29 @@ describe('normalizeYearInput', () => {
     expect(normalizeYearInput('+710')).toBeNull();
     expect(normalizeYearInput('7 10')).toBeNull();
     expect(normalizeYearInput('1.5')).toBeNull();
+  });
+});
+
+describe('splitYearText', () => {
+  it('数字とその後ろに分ける', () => {
+    expect(splitYearText('1467年')).toEqual({ prefix: '', number: '1467', suffix: '年' });
+    expect(splitYearText('250年ごろ')).toEqual({ prefix: '', number: '250', suffix: '年ごろ' });
+    expect(splitYearText('11世紀初めごろ')).toEqual({
+      prefix: '',
+      number: '11',
+      suffix: '世紀初めごろ',
+    });
+  });
+
+  it('数字の前の文字も分ける', () => {
+    expect(splitYearText('紀元前57年ごろ')).toEqual({
+      prefix: '紀元前',
+      number: '57',
+      suffix: '年ごろ',
+    });
+  });
+
+  it('数字が無ければ全体を prefix にする', () => {
+    expect(splitYearText('不明')).toEqual({ prefix: '不明', number: '', suffix: '' });
   });
 });

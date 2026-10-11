@@ -5,6 +5,8 @@ interface ConfirmDialogProps {
   children?: ReactNode;
   confirmLabel: string;
   cancelLabel: string;
+  /** 実行のボタンを赤にする（元に戻せない操作の確認だけに使う）。 */
+  destructive?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -18,6 +20,7 @@ export function ConfirmDialog({
   children,
   confirmLabel,
   cancelLabel,
+  destructive = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -46,15 +49,14 @@ export function ConfirmDialog({
         </h2>
         {children !== undefined && <div className="dialog-body">{children}</div>}
         <div className="dialog-actions">
-          <button
-            ref={cancelRef}
-            type="button"
-            className="button-secondary dialog-button"
-            onClick={onCancel}
-          >
+          <button ref={cancelRef} type="button" className="button-secondary" onClick={onCancel}>
             {cancelLabel}
           </button>
-          <button type="button" className="button-primary dialog-button" onClick={onConfirm}>
+          <button
+            type="button"
+            className={destructive ? 'button-primary button-destructive' : 'button-primary'}
+            onClick={onConfirm}
+          >
             {confirmLabel}
           </button>
         </div>
