@@ -30,7 +30,7 @@
 
 ## データ
 
-- 教材データは `data/decks/japanese-history/` の `core.csv`（出題対象）と `pool.csv`（4 択の誤答用）。
+- 教材データは `data/decks/japanese-history/` の `core.csv`（基本の年表）と `pool.csv`（追加データ）。
 - 列の形式と検証の規則は `docs/design.md` の 5 章を参照。
 
 ## デプロイ

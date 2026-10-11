@@ -41,7 +41,8 @@ export function Result({ result, onHome }: ResultProps) {
           ) : (
             <ul className="wrong-list" data-testid="wrong-list">
               {wrong.map((answer) => (
-                <li key={answer.event.id} className="wrong-item">
+                // 復習では同じ出来事が 2 つのパターンで出ることがあるので、パターンも key に含める
+                <li key={`${answer.pattern}:${answer.event.id}`} className="wrong-item">
                   <span className="wrong-title">{answer.event.title}</span>
                   <span className="wrong-year">{formatAnswerYears(answer.event)}</span>
                 </li>

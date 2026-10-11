@@ -16,7 +16,7 @@ describe('data/decks/japanese-history', () => {
     expect(result.ok ? [] : result.errors).toEqual([]);
   });
 
-  it('出題対象の出来事がある（誤答用の pool.csv は空でもよい）', () => {
+  it('基本の年表（core.csv）の出来事がある（追加データの pool.csv は空でもよい）', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const roles = result.deck.events.map((event) => event.role);

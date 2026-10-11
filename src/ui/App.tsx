@@ -10,15 +10,20 @@ import { Home } from './screens/Home';
 import { Quiz, type QuizResult } from './screens/Quiz';
 import { QuizSetup } from './screens/QuizSetup';
 import { Result } from './screens/Result';
+import { ReviewSetup } from './screens/ReviewSetup';
+import { Stats } from './screens/Stats';
 
 const deck = deckJson as Deck;
+/** 出題の母集団。出題設定の「出題する出来事」の絞り込みは出題設定の画面で行い、復習と成績はこの全体を使う。 */
 const targets = population(deck);
-const poolCount = deck.events.filter((event) => event.role === 'pool').length;
+const coreCount = targets.filter((event) => event.role === 'core').length;
 
 /** 画面の状態。ルーティングライブラリは使わず、アプリ内の状態で切り替える（設計書 3 章）。 */
 type View =
   | { screen: 'home' }
   | { screen: 'setup' }
+  | { screen: 'review-setup' }
+  | { screen: 'stats' }
   | { screen: 'quiz'; session: Session; questions: Question[] }
   | { screen: 'result'; result: QuizResult };
 
@@ -95,6 +100,20 @@ export function App() {
       />
     );
   }
+  if (store !== null && view.screen === 'review-setup') {
+    return (
+      <ReviewSetup
+        store={store}
+        population={targets}
+        allEvents={deck.events}
+        onStart={(session, questions) => setView({ screen: 'quiz', session, questions })}
+        onBack={() => setView({ screen: 'home' })}
+      />
+    );
+  }
+  if (store !== null && view.screen === 'stats') {
+    return <Stats store={store} population={targets} onBack={() => setView({ screen: 'home' })} />;
+  }
   if (store !== null && view.screen === 'quiz') {
     return (
       <Quiz
@@ -114,10 +133,12 @@ export function App() {
     <Home
       deckName={deck.name}
       targetCount={targets.length}
-      poolCount={poolCount}
+      coreCount={coreCount}
       version={__APP_VERSION__}
       storeStatus={storeState}
       onStartQuiz={() => setView({ screen: 'setup' })}
+      onStartReview={() => setView({ screen: 'review-setup' })}
+      onOpenStats={() => setView({ screen: 'stats' })}
       installBannerVisible={installBannerVisible}
       onCloseInstallBanner={() => setInstallBannerVisible(false)}
       updateAvailable={update.available}

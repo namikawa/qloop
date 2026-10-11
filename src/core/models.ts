@@ -22,7 +22,10 @@ export type Pattern = 'yearInput' | 'choice';
 /** 学習段階。CSV の `level` 列が空なら `中学`。 */
 export type Level = '中学' | '高校';
 
-/** 出来事の役割。`core.csv` の行は出題対象、`pool.csv` の行は誤答専用。 */
+/**
+ * 出来事の区分。`core.csv` の行は基本の年表（初期データ）、`pool.csv` の行は追加データ。
+ * どちらも `level` が `中学` なら出題の母集団に入り、4 択の誤答の候補には両方を使う。
+ */
 export type Role = 'core' | 'pool';
 
 /** 出来事（年表の 1 行）。 */
@@ -87,7 +90,7 @@ export interface Attempt {
   sessionId: string;
 }
 
-/** セッションの種類。`review` は復習モード（PR 3）。 */
+/** セッションの種類。`review` は復習モード（設計書 7 章）。 */
 export type SessionMode = 'normal' | 'review';
 
 /** セッション（IndexedDB の `sessions`。設計書 5.4 節）。 */
@@ -127,8 +130,15 @@ export interface EventStats {
   lastWrongAt: string | null;
 }
 
+/**
+ * 出題設定の「出題する出来事」（設計書 6.1 節の 1）。
+ * `core` = 基本の年表のみ（`core.csv` の行。既定）、`all` = すべて（追加データを含む）。
+ */
+export type EventScope = 'core' | 'all';
+
 /** 出題設定（IndexedDB の `meta.settings`）。最後に選んだものを次回の初期値にする。 */
 export interface Settings {
+  scope: EventScope;
   pattern: PatternMode;
   count: QuestionCount;
   range: Range;

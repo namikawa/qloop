@@ -3,6 +3,7 @@ import { ERAS } from '../../core/era';
 import type {
   Era,
   Event,
+  EventScope,
   PatternMode,
   Question,
   QuestionCount,
@@ -10,16 +11,24 @@ import type {
   Session,
   Settings,
 } from '../../core/models';
-import { eligibleQuestions, generateSession } from '../../core/quiz';
+import { eligibleQuestions, filterByScope, generateSession } from '../../core/quiz';
 import { filterByRange, parseRangeYear, validateRange } from '../../core/range';
 import type { ProgressStore } from '../../storage/progress-store';
 
-/** 保存した設定が無いときの初期値（問題数の既定は 10。設計書 6.1 節の 4）。 */
+/**
+ * 保存した設定が無いときの初期値（設計書 6.1 節）。出題する出来事は塾が推奨する基本の年表のみ、問題数は 10。
+ */
 export const DEFAULT_SETTINGS: Settings = {
+  scope: 'core',
   pattern: 'yearInput',
   count: 10,
   range: { kind: 'all' },
 };
+
+const SCOPE_OPTIONS: { value: EventScope; label: string }[] = [
+  { value: 'core', label: '基本の年表のみ' },
+  { value: 'all', label: 'すべて' },
+];
 
 const PATTERN_OPTIONS: { value: PatternMode; label: string }[] = [
   { value: 'yearInput', label: '年号入力' },
@@ -27,7 +36,8 @@ const PATTERN_OPTIONS: { value: PatternMode; label: string }[] = [
   { value: 'mixed', label: 'ミックス' },
 ];
 
-const COUNT_OPTIONS: { value: QuestionCount; label: string }[] = [
+/** 問題数の選択肢（出題設定と復習で共通）。 */
+export const COUNT_OPTIONS: { value: QuestionCount; label: string }[] = [
   { value: 10, label: '10 問' },
   { value: 20, label: '20 問' },
   { value: 'all', label: '全問' },
@@ -41,7 +51,7 @@ const RANGE_OPTIONS: { value: Range['kind']; label: string }[] = [
 
 interface QuizSetupProps {
   store: ProgressStore;
-  /** 出題の母集団。 */
+  /** 出題の母集団（「出題する出来事」で絞り込む前のもの）。 */
   population: readonly Event[];
   /** 誤答の候補に使う全出来事。 */
   allEvents: readonly Event[];
@@ -49,9 +59,10 @@ interface QuizSetupProps {
   onBack: () => void;
 }
 
-/** 出題設定の画面（設計書 6.1 節・6.4 節の 1）。パターン・問題数・範囲を選んで開始する。 */
+/** 出題設定の画面（設計書 6.1 節・6.4 節の 1）。出題する出来事・パターン・問題数・範囲を選んで開始する。 */
 export function QuizSetup({ store, population, allEvents, onStart, onBack }: QuizSetupProps) {
   const [initial] = useState(() => store.getSettings() ?? DEFAULT_SETTINGS);
+  const [scope, setScope] = useState<EventScope>(initial.scope);
   const [pattern, setPattern] = useState<PatternMode>(initial.pattern);
   const [count, setCount] = useState<QuestionCount>(initial.count);
   const [rangeKind, setRangeKind] = useState<Range['kind']>(initial.range.kind);
@@ -87,7 +98,10 @@ export function QuizSetup({ store, population, allEvents, onStart, onBack }: Qui
   if (range !== null) {
     problem = validateRange(range);
   }
-  const candidates = range !== null && problem === null ? filterByRange(population, range) : [];
+  const candidates =
+    range !== null && problem === null
+      ? filterByRange(filterByScope(population, scope), range)
+      : [];
   const eligibleCount =
     range !== null && problem === null
       ? eligibleQuestions(candidates, allEvents, pattern).length
@@ -123,7 +137,7 @@ export function QuizSetup({ store, population, allEvents, onStart, onBack }: Qui
     setStarting(true);
     setStartError(null);
     try {
-      await store.saveSettings({ pattern, count, range });
+      await store.saveSettings({ scope, pattern, count, range });
       const session = await store.startSession({
         mode: 'normal',
         pattern,
@@ -147,6 +161,23 @@ export function QuizSetup({ store, population, allEvents, onStart, onBack }: Qui
       </header>
 
       <main className="setup">
+        <fieldset className="field">
+          <legend className="field-legend">出題する出来事</legend>
+          <div className="options options-2">
+            {SCOPE_OPTIONS.map((option) => (
+              <label key={option.value} className="option">
+                <input
+                  type="radio"
+                  name="scope"
+                  checked={scope === option.value}
+                  onChange={() => setScope(option.value)}
+                />
+                <span>{option.label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
         <fieldset className="field">
           <legend className="field-legend">出題パターン</legend>
           <div className="options options-3">

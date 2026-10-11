@@ -6,12 +6,15 @@ export type StoreStatus =
 
 interface HomeProps {
   deckName: string;
-  /** 出題対象（母集団）の件数。 */
+  /** 出題できる出来事（母集団）の件数。 */
   targetCount: number;
-  poolCount: number;
+  /** 母集団のうち、基本の年表（core.csv）の件数。 */
+  coreCount: number;
   version: string;
   storeStatus: StoreStatus;
   onStartQuiz: () => void;
+  onStartReview: () => void;
+  onOpenStats: () => void;
   installBannerVisible: boolean;
   onCloseInstallBanner: () => void;
   updateAvailable: boolean;
@@ -21,10 +24,12 @@ interface HomeProps {
 export function Home({
   deckName,
   targetCount,
-  poolCount,
+  coreCount,
   version,
   storeStatus,
   onStartQuiz,
+  onStartReview,
+  onOpenStats,
   installBannerVisible,
   onCloseInstallBanner,
   updateAvailable,
@@ -66,16 +71,11 @@ export function Home({
           <h2 id="deck-name" className="deck-name">
             {deckName}
           </h2>
-          <dl className="deck-counts">
-            <div className="deck-count">
-              <dt>出題対象</dt>
-              <dd data-testid="target-count">{targetCount} 件</dd>
-            </div>
-            <div className="deck-count">
-              <dt>誤答用</dt>
-              <dd data-testid="pool-count">{poolCount} 件</dd>
-            </div>
-          </dl>
+          <p className="deck-count-text" data-testid="target-count">
+            {/* 狭い画面では括弧の前で折り返す */}
+            <span className="nowrap">出題できる出来事 {targetCount} 件</span>
+            <span className="nowrap">（基本の年表 {coreCount} 件）</span>
+          </p>
         </section>
 
         {storeStatus.status === 'loading' && (
@@ -99,11 +99,21 @@ export function Home({
           >
             出題
           </button>
-          <button type="button" className="button-secondary" disabled>
-            復習（準備中）
+          <button
+            type="button"
+            className="button-secondary"
+            disabled={storeStatus.status !== 'ready'}
+            onClick={onStartReview}
+          >
+            復習
           </button>
-          <button type="button" className="button-secondary" disabled>
-            成績（準備中）
+          <button
+            type="button"
+            className="button-secondary"
+            disabled={storeStatus.status !== 'ready'}
+            onClick={onOpenStats}
+          >
+            成績
           </button>
         </div>
       </main>

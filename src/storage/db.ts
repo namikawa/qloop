@@ -5,9 +5,14 @@ import type { Attempt, EventStats, Pattern, Session, Settings } from '../core/mo
 export const DB_NAME = 'qloop';
 export const DB_VERSION = 1;
 
+/**
+ * 保存された出題設定。PR 3 より前に保存したものには `scope` が無い（読み込むときに `core` とみなす）。
+ */
+export type StoredSettings = Omit<Settings, 'scope'> & Partial<Pick<Settings, 'scope'>>;
+
 /** `meta` ストアのレコード。`key` で種類を分ける。 */
 export type MetaRecord =
-  | { key: 'settings'; value: Settings }
+  | { key: 'settings'; value: StoredSettings }
   /** 回答のあった端末ローカルの暦日（`YYYY-MM-DD`）。昇順で重複なし。 */
   | { key: 'studyDays'; value: string[] };
 

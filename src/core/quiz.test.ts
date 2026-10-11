@@ -3,6 +3,7 @@ import type { Event, Question } from './models';
 import {
   distractorCandidates,
   eligibleQuestions,
+  filterByScope,
   generateChoices,
   generateSession,
   isChoiceEligible,
@@ -12,6 +13,7 @@ import {
   population,
 } from './quiz';
 import { mulberry32 } from './random';
+import { filterByRange } from './range';
 
 function ev(id: string, year: number, extra: Partial<Event> = {}): Event {
   return {
@@ -109,14 +111,36 @@ function spread(count: number, prefix = 'e'): Event[] {
 const SEEDS = Array.from({ length: 40 }, (_, i) => i + 1);
 
 describe('population', () => {
-  it('core.csv の中学の出来事だけを母集団にする（pool と高校の行は外す）', () => {
+  it('core.csv と pool.csv の中学の出来事を母集団にする（高校の行は外す）', () => {
     const events = [
       ev('core', 1600, { role: 'core' }),
       ev('core-high', 1601, { role: 'core', level: '高校' }),
       ev('pool', 1602, { role: 'pool' }),
       ev('pool-high', 1603, { role: 'pool', level: '高校' }),
     ];
-    expect(ids(population({ events }))).toEqual(['core']);
+    expect(ids(population({ events }))).toEqual(['core', 'pool']);
+  });
+});
+
+describe('filterByScope', () => {
+  const events = [
+    ev('core1', 1600, { role: 'core' }),
+    ev('pool1', 1602, { role: 'pool' }),
+    ev('core2', 1604, { role: 'core' }),
+  ];
+
+  it('基本の年表のみ（core）は core.csv の行に絞る', () => {
+    expect(ids(filterByScope(events, 'core'))).toEqual(['core1', 'core2']);
+  });
+
+  it('すべて（all）は絞り込まない', () => {
+    expect(ids(filterByScope(events, 'all'))).toEqual(['core1', 'pool1', 'core2']);
+  });
+
+  it('範囲の指定と組み合わせると、絞り込んだ後の出来事に範囲を適用する', () => {
+    const range = { kind: 'years', from: 1601, to: null } as const;
+    expect(ids(filterByRange(filterByScope(events, 'core'), range))).toEqual(['core2']);
+    expect(ids(filterByRange(filterByScope(events, 'all'), range))).toEqual(['pool1', 'core2']);
   });
 });
 

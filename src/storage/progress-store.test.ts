@@ -1,8 +1,9 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Settings } from '../core/models';
+import type { Attempt, Session, Settings } from '../core/models';
 import { openDb, type QLoopDb } from './db';
-import { localDateKey, ProgressStore, type StartSessionInput } from './progress-store';
+import { ProgressStore, type StartSessionInput } from './progress-store';
+import { ImportFormatError, type ProgressExport } from './transfer';
 
 let dbCount = 0;
 let dbName: string;
@@ -414,6 +415,7 @@ describe('ProgressStore.load', () => {
 
 describe('ProgressStore の設定', () => {
   const settings: Settings = {
+    scope: 'all',
     pattern: 'choice',
     count: 20,
     range: { kind: 'years', from: 700, to: null },
@@ -429,6 +431,7 @@ describe('ProgressStore の設定', () => {
     expect(store.getSettings()).toEqual(settings);
 
     const next: Settings = {
+      scope: 'core',
       pattern: 'mixed',
       count: 'all',
       range: { kind: 'eras', eras: ['江戸'] },
@@ -436,6 +439,21 @@ describe('ProgressStore の設定', () => {
     await store.saveSettings(next);
     const again = await createStore(first.db);
     expect(again.store.getSettings()).toEqual(next);
+  });
+
+  it('scope の無い（PR 3 より前の）設定は、基本の年表のみ（core）として読む', async () => {
+    const db = await open();
+    await db.put('meta', {
+      key: 'settings',
+      value: { pattern: 'choice', count: 20, range: { kind: 'all' } },
+    });
+    const { store } = await createStore(db);
+    expect(store.getSettings()).toEqual({
+      scope: 'core',
+      pattern: 'choice',
+      count: 20,
+      range: { kind: 'all' },
+    });
   });
 });
 
@@ -457,7 +475,12 @@ describe('データベースの開き直し', () => {
       correct: false,
       endSession: true,
     });
-    await first.store.saveSettings({ pattern: 'yearInput', count: 10, range: { kind: 'all' } });
+    await first.store.saveSettings({
+      scope: 'core',
+      pattern: 'yearInput',
+      count: 10,
+      range: { kind: 'all' },
+    });
     first.db.close();
 
     const reopened = await open();
@@ -471,6 +494,7 @@ describe('データベースの開き直し', () => {
     expect(store.getEventStats('demo-0002', 'choice')).toMatchObject({ attempts: 1, correct: 0 });
     expect(store.getStudyDays()).toEqual(['2026-10-11']);
     expect(store.getSettings()).toEqual({
+      scope: 'core',
       pattern: 'yearInput',
       count: 10,
       range: { kind: 'all' },
@@ -488,9 +512,382 @@ describe('データベースの開き直し', () => {
   });
 });
 
-describe('localDateKey', () => {
-  it('端末ローカルの暦日を YYYY-MM-DD にする', () => {
-    expect(localDateKey(new Date(2026, 0, 2, 23, 59, 59))).toBe('2026-01-02');
-    expect(localDateKey(new Date(2026, 11, 31, 0, 0, 0))).toBe('2026-12-31');
+/** 1 回答を記録する（テストを短く書くための補助）。 */
+function answer(
+  store: ProgressStore,
+  sessionId: string,
+  eventId: string,
+  pattern: 'yearInput' | 'choice',
+  correct: boolean,
+  endSession = false,
+): Promise<void> {
+  return store.recordAnswer({ sessionId, eventId, pattern, correct, endSession });
+}
+
+/** 2 つのセッション・2 日にまたがる記録を作る。 */
+async function seed(store: ProgressStore): Promise<{ first: Session; second: Session }> {
+  const first = await store.startSession({ ...NORMAL, total: 3 });
+  advance(1000);
+  await answer(store, first.id, 'jh-0001', 'yearInput', false);
+  advance(1000);
+  await answer(store, first.id, 'jh-0001', 'choice', true);
+  advance(1000);
+  await answer(store, first.id, 'jh-0002', 'yearInput', true, true);
+  advance(DAY);
+  const second = await store.startSession({ mode: 'review', pattern: null, range: null, total: 2 });
+  advance(1000);
+  await answer(store, second.id, 'jh-0001', 'yearInput', true);
+  advance(1000);
+  await answer(store, second.id, 'jh-0002', 'yearInput', false);
+  return { first, second };
+}
+
+const byKey = <T extends { eventId: string; pattern: string }>(records: T[]) =>
+  [...records].sort((a, b) =>
+    `${a.eventId}:${a.pattern}`.localeCompare(`${b.eventId}:${b.pattern}`),
+  );
+const byId = (sessions: Session[]) => [...sessions].sort((a, b) => a.id.localeCompare(b.id));
+
+describe('ProgressStore.rebuild', () => {
+  it('attempts から eventStats・sessions の件数・studyDays を復元する（他の項目と設定はそのまま）', async () => {
+    const { store, db } = await createStore();
+    await seed(store);
+    const settings: Settings = {
+      scope: 'all',
+      pattern: 'choice',
+      count: 20,
+      range: { kind: 'all' },
+    };
+    await store.saveSettings(settings);
+    const expectedStats = byKey(await db.getAll('eventStats'));
+    const expectedSessions = byId(await db.getAll('sessions'));
+    expect(expectedSessions).toHaveLength(2);
+
+    // 派生データを壊す
+    await db.clear('eventStats');
+    for (const session of expectedSessions) {
+      await db.put('sessions', { ...session, answered: 99, correct: 99 });
+    }
+    await db.put('meta', { key: 'studyDays', value: [] });
+
+    await store.rebuild();
+    expect(byKey(await db.getAll('eventStats'))).toEqual(expectedStats);
+    expect(byId(await db.getAll('sessions'))).toEqual(expectedSessions);
+    expect(await db.get('meta', 'studyDays')).toEqual({
+      key: 'studyDays',
+      value: ['2026-10-11', '2026-10-12'],
+    });
+    expect(byKey(store.listEventStats())).toEqual(expectedStats);
+    expect(byId(store.listSessions())).toEqual(expectedSessions);
+    expect(store.getStudyDays()).toEqual(['2026-10-11', '2026-10-12']);
+    expect(store.getSettings()).toEqual(settings);
+  });
+
+  it('最後の回答・最後の不正解は記録した順で決め、回答の無いセッションは 0 件にする', async () => {
+    const { store, db } = await createStore();
+    const session = await store.startSession(NORMAL);
+    const empty = await store.startSession(NORMAL);
+    await store.endSession(empty.id);
+    await db.put('sessions', { ...(await db.get('sessions', empty.id))!, answered: 3 });
+    advance(HOUR);
+    await answer(store, session.id, 'jh-0003', 'yearInput', false); // 02:00
+    advance(HOUR);
+    await answer(store, session.id, 'jh-0003', 'yearInput', true); // 03:00
+    await db.clear('eventStats');
+
+    await store.rebuild();
+    expect(store.getEventStats('jh-0003', 'yearInput')).toEqual({
+      eventId: 'jh-0003',
+      pattern: 'yearInput',
+      attempts: 2,
+      correct: 1,
+      lastAnsweredAt: '2026-10-11T03:00:00.000Z',
+      lastCorrect: true,
+      lastWrongAt: '2026-10-11T02:00:00.000Z',
+    });
+    expect(store.getSession(empty.id)).toMatchObject({ answered: 0, correct: 0 });
+    expect((await db.get('sessions', empty.id))?.answered).toBe(0);
+  });
+
+  it('現在のデータに無い eventId の回答も再計算に含める', async () => {
+    const { store, db } = await createStore();
+    const session = await store.startSession(NORMAL);
+    await answer(store, session.id, 'demo-0001', 'choice', false);
+    await db.clear('eventStats');
+    await store.rebuild();
+    expect(store.getEventStats('demo-0001', 'choice')).toMatchObject({ attempts: 1, correct: 0 });
+    expect(store.getSession(session.id)).toMatchObject({ answered: 1, correct: 0 });
+  });
+
+  it('学習日は注入した暦（dateKey）で数え直す', async () => {
+    const db = await open();
+    const store = new ProgressStore({
+      db,
+      now: () => current,
+      // 端末のタイムゾーンを UTC+9 とみなす暦
+      dateKey: (date) => new Date(date.getTime() + 9 * HOUR).toISOString().slice(0, 10),
+      newId: () => `session-${++idCount}`,
+    });
+    await store.load();
+    const session = await store.startSession(NORMAL);
+    current = new Date('2026-10-11T14:59:00.000Z'); // UTC+9 では 10 月 11 日 23:59
+    await answer(store, session.id, 'jh-0001', 'choice', true);
+    current = new Date('2026-10-11T15:01:00.000Z'); // UTC+9 では 10 月 12 日 0:01
+    await answer(store, session.id, 'jh-0001', 'choice', true);
+    await db.put('meta', { key: 'studyDays', value: [] });
+    await store.rebuild();
+    expect(store.getStudyDays()).toEqual(['2026-10-11', '2026-10-12']);
+  });
+});
+
+describe('ProgressStore.exportData と importData', () => {
+  it('書き出しは schemaVersion・書き出した時刻・attempts の全件・sessions を返す', async () => {
+    const { store, db } = await createStore();
+    const { first, second } = await seed(store);
+    const data = await store.exportData();
+    expect(data.schemaVersion).toBe(1);
+    expect(data.exportedAt).toBe(current.toISOString());
+    expect(data.attempts).toEqual(await db.getAll('attempts'));
+    expect(data.attempts.map((attempt) => attempt.id)).toEqual([1, 2, 3, 4, 5]);
+    expect(byId(data.sessions)).toEqual(
+      byId([store.getSession(first.id)!, store.getSession(second.id)!]),
+    );
+  });
+
+  it('書き出した JSON を別の端末で読み込むと、同じ記録と集計になる', async () => {
+    const source = await createStore();
+    await seed(source.store);
+    const json = JSON.stringify(await source.store.exportData());
+
+    dbName = `${dbName}-target`;
+    const target = await createStore();
+    await target.store.importData(JSON.parse(json));
+
+    const stripId = (attempts: Attempt[]) =>
+      attempts.map(({ eventId, pattern, correct, answeredAt, sessionId }) => ({
+        eventId,
+        pattern,
+        correct,
+        answeredAt,
+        sessionId,
+      }));
+    expect(stripId(await target.db.getAll('attempts'))).toEqual(
+      stripId(await source.db.getAll('attempts')),
+    );
+    expect(byKey(await target.db.getAll('eventStats'))).toEqual(
+      byKey(await source.db.getAll('eventStats')),
+    );
+    expect(byId(await target.db.getAll('sessions'))).toEqual(
+      byId(await source.db.getAll('sessions')),
+    );
+    expect(await target.db.get('meta', 'studyDays')).toEqual(
+      await source.db.get('meta', 'studyDays'),
+    );
+    expect(byKey(target.store.listEventStats())).toEqual(byKey(source.store.listEventStats()));
+    expect(target.store.listSessions()).toEqual(source.store.listSessions());
+    expect(target.store.getStudyDays()).toEqual(source.store.getStudyDays());
+  });
+
+  it('読み込みは既存の記録と設定を消して全置換し、attempts の id は捨てて自動採番する', async () => {
+    const { store, db } = await createStore();
+    const old = await store.startSession(NORMAL);
+    await answer(store, old.id, 'jh-0009', 'choice', true);
+    await store.saveSettings({
+      scope: 'all',
+      pattern: 'choice',
+      count: 20,
+      range: { kind: 'all' },
+    });
+
+    const imported: ProgressExport = {
+      schemaVersion: 1,
+      exportedAt: '2026-10-01T00:00:00.000Z',
+      attempts: [
+        {
+          id: 500,
+          eventId: 'jh-0001',
+          pattern: 'yearInput',
+          correct: false,
+          answeredAt: '2026-10-01T00:00:01.000Z',
+          sessionId: 'imported',
+        },
+        {
+          id: 7,
+          eventId: 'jh-0001',
+          pattern: 'yearInput',
+          correct: true,
+          answeredAt: '2026-10-01T00:00:02.000Z',
+          sessionId: 'imported',
+        },
+      ],
+      sessions: [
+        {
+          id: 'imported',
+          mode: 'normal',
+          pattern: 'yearInput',
+          range: { kind: 'years', from: 700, to: 1600 },
+          startedAt: '2026-10-01T00:00:00.000Z',
+          endedAt: null,
+          total: 10,
+          // 件数は attempts から数え直す
+          answered: 0,
+          correct: 0,
+        },
+      ],
+    };
+    await store.importData(imported);
+
+    const attempts = await db.getAll('attempts');
+    expect(attempts.map((attempt) => [attempt.id, attempt.correct])).toEqual([
+      [2, false],
+      [3, true],
+    ]);
+    expect(await db.getAll('sessions')).toEqual([
+      { ...imported.sessions[0], answered: 2, correct: 1 },
+    ]);
+    expect(await db.getAll('eventStats')).toEqual([
+      {
+        eventId: 'jh-0001',
+        pattern: 'yearInput',
+        attempts: 2,
+        correct: 1,
+        lastAnsweredAt: '2026-10-01T00:00:02.000Z',
+        lastCorrect: true,
+        lastWrongAt: '2026-10-01T00:00:01.000Z',
+      },
+    ]);
+    expect(await db.get('meta', 'settings')).toBeUndefined();
+    expect(await db.get('meta', 'studyDays')).toEqual({ key: 'studyDays', value: ['2026-10-01'] });
+
+    // メモリ上の状態も読み込んだ内容になる
+    expect(store.getEventStats('jh-0009', 'choice')).toBeUndefined();
+    expect(store.getEventStats('jh-0001', 'yearInput')).toMatchObject({ attempts: 2, correct: 1 });
+    expect(store.getSession(old.id)).toBeUndefined();
+    expect(store.listSessions()).toEqual([{ ...imported.sessions[0], answered: 2, correct: 1 }]);
+    expect(store.getStudyDays()).toEqual(['2026-10-01']);
+    expect(store.getSettings()).toBeNull();
+  });
+
+  it.each([
+    [
+      'schemaVersion が違う',
+      { schemaVersion: 2, exportedAt: '2026-10-01T00:00:00.000Z', attempts: [], sessions: [] },
+      /schemaVersion/,
+    ],
+    [
+      'attempts が配列でない',
+      { schemaVersion: 1, exportedAt: '2026-10-01T00:00:00.000Z', attempts: {}, sessions: [] },
+      /attempts/,
+    ],
+    [
+      'attempts の項目の型が合わない',
+      {
+        schemaVersion: 1,
+        exportedAt: '2026-10-01T00:00:00.000Z',
+        attempts: [
+          {
+            eventId: 'jh-0001',
+            pattern: 'yearInput',
+            correct: 'yes',
+            answeredAt: '2026-10-01T00:00:01.000Z',
+            sessionId: 's',
+          },
+        ],
+        sessions: [],
+      },
+      /attempts の 1 件目: correct/,
+    ],
+    ['オブジェクトでない', 'hello', /形式ではありません/],
+  ])('形式が不正（%s）なら理由を含む例外を投げ、何も変えない', async (_label, data, reason) => {
+    const { store, db } = await createStore();
+    await seed(store);
+    await store.saveSettings({
+      scope: 'all',
+      pattern: 'choice',
+      count: 20,
+      range: { kind: 'all' },
+    });
+    const before = {
+      attempts: await db.getAll('attempts'),
+      stats: await db.getAll('eventStats'),
+      sessions: await db.getAll('sessions'),
+      meta: await db.getAll('meta'),
+      memoryStats: store.listEventStats(),
+      memorySessions: store.listSessions(),
+    };
+
+    const result = store.importData(data);
+    await expect(result).rejects.toBeInstanceOf(ImportFormatError);
+    await expect(result).rejects.toThrow(reason);
+
+    expect(await db.getAll('attempts')).toEqual(before.attempts);
+    expect(await db.getAll('eventStats')).toEqual(before.stats);
+    expect(await db.getAll('sessions')).toEqual(before.sessions);
+    expect(await db.getAll('meta')).toEqual(before.meta);
+    expect(store.listEventStats()).toEqual(before.memoryStats);
+    expect(store.listSessions()).toEqual(before.memorySessions);
+    expect(store.getSettings()).toMatchObject({ scope: 'all' });
+  });
+
+  it('全置換の途中（再計算）で失敗したら、読み込み前の状態に戻る', async () => {
+    const db = await open();
+    let failDateKey = false;
+    const store = new ProgressStore({
+      db,
+      now: () => current,
+      dateKey: (date) => {
+        if (failDateKey) {
+          throw new Error('暦の計算に失敗');
+        }
+        return date.toISOString().slice(0, 10);
+      },
+      newId: () => `session-${++idCount}`,
+    });
+    await store.load();
+    await seed(store);
+    const data = await store.exportData();
+    const before = {
+      attempts: await db.getAll('attempts'),
+      stats: await db.getAll('eventStats'),
+      sessions: await db.getAll('sessions'),
+      meta: await db.getAll('meta'),
+    };
+
+    failDateKey = true;
+    await expect(store.importData(data)).rejects.toThrow('暦の計算に失敗');
+    expect(await db.getAll('attempts')).toEqual(before.attempts);
+    expect(await db.getAll('eventStats')).toEqual(before.stats);
+    expect(await db.getAll('sessions')).toEqual(before.sessions);
+    expect(await db.getAll('meta')).toEqual(before.meta);
+    expect(byKey(store.listEventStats())).toEqual(byKey(before.stats));
+  });
+});
+
+describe('ProgressStore.reset', () => {
+  it('全ストアを空にし、メモリ上の状態も初期化する', async () => {
+    const { store, db } = await createStore();
+    await seed(store);
+    await store.saveSettings({
+      scope: 'all',
+      pattern: 'choice',
+      count: 20,
+      range: { kind: 'all' },
+    });
+
+    await store.reset();
+    expect(await db.count('attempts')).toBe(0);
+    expect(await db.count('eventStats')).toBe(0);
+    expect(await db.count('sessions')).toBe(0);
+    expect(await db.count('meta')).toBe(0);
+    expect(store.listEventStats()).toEqual([]);
+    expect(store.listSessions()).toEqual([]);
+    expect(store.getStudyDays()).toEqual([]);
+    expect(store.getSettings()).toBeNull();
+
+    // リセットの後も記録を続けられる
+    const session = await store.startSession(NORMAL);
+    await answer(store, session.id, 'jh-0001', 'choice', true);
+    expect(store.listEventStats()).toHaveLength(1);
+    expect(await db.count('attempts')).toBe(1);
   });
 });

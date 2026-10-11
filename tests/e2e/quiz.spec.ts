@@ -1,36 +1,12 @@
-import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-
-interface DeckEvent {
-  id: string;
-  year: number;
-  title: string;
-}
-
-/** deck.json は webServer のビルドで生成されるので、テストの中で読む。 */
-function readDeckEvents(): DeckEvent[] {
-  const path = new URL('../../src/generated/deck.json', import.meta.url);
-  return (JSON.parse(readFileSync(path, 'utf8')) as { events: DeckEvent[] }).events;
-}
-
-async function expectNoHorizontalScroll(page: Page): Promise<void> {
-  const widths = await page.evaluate(() => ({
-    scroll: document.documentElement.scrollWidth,
-    client: document.documentElement.clientWidth,
-  }));
-  expect(widths.scroll).toBeLessThanOrEqual(widths.client);
-}
-
-/** ホームを開き、学習の記録を読み込み終えてから出題設定へ進む。 */
-async function openSetup(page: Page): Promise<void> {
-  await page.goto('/');
-  await page.getByRole('button', { name: '出題', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '出題設定' })).toBeVisible();
-}
-
-function radio(page: Page, name: string) {
-  return page.getByRole('radio', { name, exact: true });
-}
+import {
+  expectNoHorizontalScroll,
+  isYearInputEligible,
+  openSetup,
+  populationOf,
+  radio,
+  readDeckEvents,
+} from './helpers';
 
 interface SavedProgress {
   attempts: number;
@@ -173,13 +149,33 @@ test('年号入力で正解と不正解を 1 問ずつ答えて終了すると�
   });
 });
 
+test('出題する出来事は既定が基本の年表のみで、すべてを選ぶと追加データも対象になる', async ({
+  page,
+}) => {
+  // pool.csv の行の有無によらないよう、件数は deck.json から数える
+  const targets = populationOf(readDeckEvents()).filter(isYearInputEligible);
+  const coreCount = targets.filter((event) => event.role === 'core').length;
+  await openSetup(page);
+  await expect(radio(page, '基本の年表のみ')).toBeChecked();
+  await radio(page, '年号入力').check();
+  await radio(page, '全範囲').check();
+  await expect(page.getByTestId('eligible-count')).toHaveText(`対象 ${coreCount} 件`);
+  await radio(page, 'すべて').check();
+  await expect(page.getByTestId('eligible-count')).toHaveText(`対象 ${targets.length} 件`);
+  await radio(page, '基本の年表のみ').check();
+  await expect(page.getByTestId('eligible-count')).toHaveText(`対象 ${coreCount} 件`);
+  await expectNoHorizontalScroll(page);
+});
+
 test('再読み込みすると、出題設定の初期値が前回開始したときの設定になる', async ({ page }) => {
   await openSetup(page);
   // 保存した設定が無いときの初期値
+  await expect(radio(page, '基本の年表のみ')).toBeChecked();
   await expect(radio(page, '年号入力')).toBeChecked();
   await expect(radio(page, '10 問')).toBeChecked();
   await expect(radio(page, '全範囲')).toBeChecked();
 
+  await radio(page, 'すべて').check();
   await radio(page, 'ミックス').check();
   await radio(page, '20 問').check();
   await radio(page, '年号の範囲').check();
@@ -206,6 +202,7 @@ test('再読み込みすると、出題設定の初期値が前回開始した�
 
   await page.reload();
   await page.getByRole('button', { name: '出題', exact: true }).click();
+  await expect(radio(page, 'すべて')).toBeChecked();
   await expect(radio(page, 'ミックス')).toBeChecked();
   await expect(radio(page, '20 問')).toBeChecked();
   await expect(radio(page, '年号の範囲')).toBeChecked();

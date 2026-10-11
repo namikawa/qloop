@@ -1,4 +1,12 @@
-import type { Deck, Event, Pattern, PatternMode, Question, QuestionCount } from './models';
+import type {
+  Deck,
+  Event,
+  EventScope,
+  Pattern,
+  PatternMode,
+  Question,
+  QuestionCount,
+} from './models';
 import { randomInt, shuffle, type Rng } from './random';
 
 /** 4 択に必要な誤答の数。 */
@@ -10,9 +18,20 @@ const APPROX_EXCLUSION_YEARS = 50;
 /** 誤答を優先して選ぶ年の差（出題年の前後この年数以内を優先する。境界を含む）。 */
 export const CHOICE_NEAR_YEARS = 100;
 
-/** 出題の母集団（設計書 6.1 節の 1）: `core.csv` のうち `level` が `中学` の出来事。 */
+/**
+ * 出題の母集団（設計書 6.1 節の 1）: `level` が `中学` の出来事（`core.csv` と `pool.csv` の両方）。
+ * `高校` の行は誤答の候補にだけ使う。復習と成績は出題設定によらずこの母集団全体を対象にする。
+ */
 export function population(deck: Pick<Deck, 'events'>): Event[] {
-  return deck.events.filter((event) => event.role === 'core' && event.level === '中学');
+  return deck.events.filter((event) => event.level === '中学');
+}
+
+/**
+ * 出題設定の「出題する出来事」で絞り込む（設計書 6.1 節の 1）。
+ * `core` は基本の年表（`core.csv` の行）だけ、`all` は絞り込まない。範囲の指定より先に適用する。
+ */
+export function filterByScope(events: readonly Event[], scope: EventScope): Event[] {
+  return scope === 'core' ? events.filter((event) => event.role === 'core') : [...events];
 }
 
 /** 年号入力に出せるか（設計書 6.1 節の 3）: `approx` でなく、`year` が正の出来事。 */
@@ -70,7 +89,8 @@ export function eligibleQuestions(
  */
 const choiceEligibilityCache = new WeakMap<readonly Event[], Map<string, boolean>>();
 
-function isChoiceEligibleCached(event: Event, allEvents: readonly Event[]): boolean {
+/** `isChoiceEligible` の結果を `allEvents` の配列ごとに覚えておく版（出題設定と復習の候補選定で使う）。 */
+export function isChoiceEligibleCached(event: Event, allEvents: readonly Event[]): boolean {
   let cache = choiceEligibilityCache.get(allEvents);
   if (cache === undefined) {
     cache = new Map();

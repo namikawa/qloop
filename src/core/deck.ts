@@ -20,9 +20,9 @@ type Column = (typeof CSV_COLUMNS)[number];
 export interface DeckInput {
   id: string;
   name: string;
-  /** core.csv の内容（出題対象）。 */
+  /** core.csv の内容（基本の年表）。 */
   core: string;
-  /** pool.csv の内容（誤答専用）。 */
+  /** pool.csv の内容（追加データ）。 */
   pool: string;
 }
 

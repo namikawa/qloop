@@ -1,3 +1,5 @@
+import type { IDBPTransaction } from 'idb';
+import { localDateKey } from '../core/date';
 import type {
   Attempt,
   EventStats,
@@ -9,7 +11,8 @@ import type {
   Settings,
 } from '../core/models';
 import { uuidFromRng } from '../core/random';
-import type { QLoopDb } from './db';
+import type { QLoopDb, QLoopSchema, StoredSettings } from './db';
+import { EXPORT_SCHEMA_VERSION, parseProgressExport, type ProgressExport } from './transfer';
 
 export interface ProgressStoreOptions {
   db: QLoopDb;
@@ -38,12 +41,6 @@ export interface RecordAnswerInput {
   correct: boolean;
   /** 最後の問題の回答なら true。同じトランザクションで `endedAt` も記録する（設計書 6.4 節の 4）。 */
   endSession: boolean;
-}
-
-/** 端末ローカルの暦日を `YYYY-MM-DD` にする。 */
-export function localDateKey(date: Date): string {
-  const pad = (value: number, width: number) => String(value).padStart(width, '0');
-  return `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1, 2)}-${pad(date.getDate(), 2)}`;
 }
 
 function defaultNewId(): string {
@@ -113,23 +110,16 @@ export class ProgressStore {
       return { stats, sessions, meta };
     });
 
-    this.stats.clear();
-    for (const record of stats) {
-      this.stats.set(statsKey(record.eventId, record.pattern), record);
-    }
-    this.sessions.clear();
-    for (const session of sessions) {
-      this.sessions.set(session.id, session);
-    }
-    this.studyDays = [];
-    this.settings = null;
+    let studyDays: string[] = [];
+    let settings: Settings | null = null;
     for (const record of meta) {
       if (record.key === 'studyDays') {
-        this.studyDays = [...record.value];
+        studyDays = record.value;
       } else if (record.key === 'settings') {
-        this.settings = record.value;
+        settings = normalizeSettings(record.value);
       }
     }
+    this.applyState({ stats, sessions, studyDays, settings });
   }
 
   /** セッションを始める（設計書 6.4 節の 2）。`sessions` にレコードを作り、そのセッションを返す。 */
@@ -282,6 +272,174 @@ export class ProgressStore {
   getStudyDays(): string[] {
     return [...this.studyDays];
   }
+
+  /**
+   * `attempts` の全件から、`eventStats`・`sessions` の `answered`・`correct`・`meta.studyDays` を再計算して
+   * 書き直す（設計書 5.4 節）。`sessions` の他の項目と出題設定はそのまま。メモリ上の状態も同じ内容にする。
+   */
+  async rebuild(): Promise<void> {
+    const tx = this.db.transaction(['attempts', 'eventStats', 'sessions', 'meta'], 'readwrite');
+    const derived = await inTransaction(tx, () => rebuildInTransaction(tx, this.dateKey));
+    this.applyState({ ...derived, settings: this.settings });
+  }
+
+  /** 書き出す内容（設計書 5.6 節）。`attempts` は全件を読む。 */
+  async exportData(): Promise<ProgressExport> {
+    const tx = this.db.transaction(['attempts', 'sessions'], 'readonly');
+    const [attempts, sessions] = await inTransaction(tx, () =>
+      Promise.all([tx.objectStore('attempts').getAll(), tx.objectStore('sessions').getAll()]),
+    );
+    return {
+      schemaVersion: EXPORT_SCHEMA_VERSION,
+      exportedAt: this.now().toISOString(),
+      attempts,
+      sessions,
+    };
+  }
+
+  /**
+   * 書き出した内容で記録を全置換する（設計書 5.6 節）。形式を検証してから、1 つのトランザクションで
+   * 全ストアを空にし、`sessions` と `attempts` を書き（`attempts` の `id` は捨てて自動採番に任せる）、
+   * `rebuild()` と同じ再計算を行う。途中で失敗しても読み込み前の状態に戻るよう、再計算も同じトランザクションで行う。
+   * 出題設定も消える。メモリ上の状態も読み込んだ内容にする。
+   * 形式が合わなければ何も変えずに、理由を入れた例外（`ImportFormatError`）を投げる。
+   */
+  async importData(data: unknown): Promise<void> {
+    const parsed = parseProgressExport(data);
+    const tx = this.db.transaction(['attempts', 'eventStats', 'sessions', 'meta'], 'readwrite');
+    const derived = await inTransaction(tx, async () => {
+      const attemptStore = tx.objectStore('attempts');
+      const sessionStore = tx.objectStore('sessions');
+      await Promise.all([
+        attemptStore.clear(),
+        tx.objectStore('eventStats').clear(),
+        sessionStore.clear(),
+        tx.objectStore('meta').clear(),
+      ]);
+      // 同じトランザクションの要求は出した順に処理されるので、attempts は配列の順に採番される
+      await Promise.all([
+        ...parsed.sessions.map((session) => sessionStore.add(session)),
+        ...parsed.attempts.map(({ eventId, pattern, correct, answeredAt, sessionId }) =>
+          attemptStore.add({ eventId, pattern, correct, answeredAt, sessionId }),
+        ),
+      ]);
+      return rebuildInTransaction(tx, this.dateKey);
+    });
+    this.applyState({ ...derived, settings: null });
+  }
+
+  /** 全ストアを空にし、メモリ上の状態も初期化する（設計書 5.6 節）。出題設定も消える。 */
+  async reset(): Promise<void> {
+    const tx = this.db.transaction(['attempts', 'eventStats', 'sessions', 'meta'], 'readwrite');
+    await inTransaction(tx, async () => {
+      await Promise.all([
+        tx.objectStore('attempts').clear(),
+        tx.objectStore('eventStats').clear(),
+        tx.objectStore('sessions').clear(),
+        tx.objectStore('meta').clear(),
+      ]);
+    });
+    this.applyState({ stats: [], sessions: [], studyDays: [], settings: null });
+  }
+
+  private applyState(state: {
+    stats: readonly EventStats[];
+    sessions: readonly Session[];
+    studyDays: readonly string[];
+    settings: Settings | null;
+  }): void {
+    this.stats.clear();
+    for (const record of state.stats) {
+      this.stats.set(statsKey(record.eventId, record.pattern), record);
+    }
+    this.sessions.clear();
+    for (const session of state.sessions) {
+      this.sessions.set(session.id, session);
+    }
+    this.studyDays = [...state.studyDays];
+    this.settings = state.settings;
+  }
+}
+
+/** 保存された出題設定を読む。`scope` が無い（PR 3 より前の）設定は `core` とみなす。 */
+function normalizeSettings(stored: StoredSettings): Settings {
+  return { ...stored, scope: stored.scope === 'all' ? 'all' : 'core' };
+}
+
+/** `attempts` から再計算した派生データ。 */
+export interface DerivedProgress {
+  stats: EventStats[];
+  sessions: Session[];
+  studyDays: string[];
+}
+
+/**
+ * `attempts` から派生データを計算する（設計書 5.4 節）。`attempts` は記録した順（自動採番の順）に並んでいること。
+ * 集計の規則は `recordAnswer` と同じ（後に記録した回答を「最後の回答」とする）。
+ * `sessions` は `answered`・`correct` だけを数え直し、他の項目はそのまま。回答の無いセッションは 0 件になる。
+ */
+export function deriveProgress(
+  attempts: readonly Attempt[],
+  sessions: readonly Session[],
+  dateKey: (date: Date) => string,
+): DerivedProgress {
+  const stats = new Map<string, EventStats>();
+  const counts = new Map<string, { answered: number; correct: number }>();
+  const days = new Set<string>();
+  for (const attempt of attempts) {
+    const key = statsKey(attempt.eventId, attempt.pattern);
+    const previous = stats.get(key);
+    stats.set(key, {
+      eventId: attempt.eventId,
+      pattern: attempt.pattern,
+      attempts: (previous?.attempts ?? 0) + 1,
+      correct: (previous?.correct ?? 0) + (attempt.correct ? 1 : 0),
+      lastAnsweredAt: attempt.answeredAt,
+      lastCorrect: attempt.correct,
+      lastWrongAt: attempt.correct ? (previous?.lastWrongAt ?? null) : attempt.answeredAt,
+    });
+    const count = counts.get(attempt.sessionId) ?? { answered: 0, correct: 0 };
+    counts.set(attempt.sessionId, {
+      answered: count.answered + 1,
+      correct: count.correct + (attempt.correct ? 1 : 0),
+    });
+    days.add(dateKey(new Date(attempt.answeredAt)));
+  }
+  return {
+    stats: [...stats.values()],
+    sessions: sessions.map((session) => ({
+      ...session,
+      ...(counts.get(session.id) ?? { answered: 0, correct: 0 }),
+    })),
+    studyDays: [...days].sort(),
+  };
+}
+
+type RebuildTransaction = IDBPTransaction<
+  QLoopSchema,
+  ['attempts', 'eventStats', 'sessions', 'meta'],
+  'readwrite'
+>;
+
+/** 開いているトランザクションの中で `attempts` を全件読み、派生データを計算して書き直す。 */
+async function rebuildInTransaction(
+  tx: RebuildTransaction,
+  dateKey: (date: Date) => string,
+): Promise<DerivedProgress> {
+  const statsStore = tx.objectStore('eventStats');
+  const sessionStore = tx.objectStore('sessions');
+  const [attempts, sessions] = await Promise.all([
+    tx.objectStore('attempts').getAll(),
+    sessionStore.getAll(),
+  ]);
+  const derived = deriveProgress(attempts, sessions, dateKey);
+  await statsStore.clear();
+  await Promise.all([
+    ...derived.stats.map((record) => statsStore.put(record)),
+    ...derived.sessions.map((session) => sessionStore.put(session)),
+    tx.objectStore('meta').put({ key: 'studyDays', value: derived.studyDays }),
+  ]);
+  return derived;
 }
 
 interface TransactionLike {
