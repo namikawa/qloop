@@ -111,8 +111,9 @@ export function Stats({ store, population, onBack }: StatsProps) {
     try {
       await shareExportFile(target);
     } catch {
-      // 共有できなければ、ダウンロードのリンクに切り替える
-      setPrepared({ ...target, canShare: false });
+      // 共有できなければ、ダウンロードのリンクに切り替える。
+      // 前の prepared は effect の後片付けで URL が解放されるので、同じファイルから URL を作り直す
+      setPrepared({ ...target, url: URL.createObjectURL(target.file), canShare: false });
       setNotice({
         kind: 'error',
         text: '共有できませんでした。「ファイルを保存」から保存してください',

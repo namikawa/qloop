@@ -319,6 +319,37 @@ test('書き出しは、ファイル共有が使えなければダウンロー�
   expect(saved.sessions.map((session) => session.answered)).toEqual([1]);
 });
 
+test('書き出しは、共有に失敗したらダウンロードのリンクに切り替わり、そこから保存できる', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'canShare', {
+      value: () => true,
+      configurable: true,
+    });
+    Object.defineProperty(Navigator.prototype, 'share', {
+      value: () => Promise.reject(new DOMException('共有できない', 'NotAllowedError')),
+      configurable: true,
+    });
+  });
+  await answerYearInputs(page, [false]);
+  await openStats(page);
+  await page.getByRole('button', { name: '書き出し' }).click();
+  await page.getByRole('button', { name: '共有して保存' }).click();
+  await expect(page.getByTestId('stats-notice')).toContainText('共有できませんでした');
+  await expect(page.getByRole('button', { name: '共有して保存' })).toHaveCount(0);
+
+  // 切り替わったリンクの URL は生きていて、保存できる
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'ファイルを保存' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^qloop-progress-\d{8}\.json$/);
+  const saved = JSON.parse(readFileSync(await download.path(), 'utf8')) as {
+    attempts: unknown[];
+  };
+  expect(saved.attempts).toHaveLength(1);
+});
+
 test('書き出しは、ファイル共有が使えれば共有のシートで JSON を渡す', async ({ page }) => {
   await page.addInitScript(() => {
     const shared: { name: string; type: string }[] = [];
