@@ -1,10 +1,17 @@
 import { calendarDaysBetween, isWithinDays, localDateKey, type DateKeyFn } from './date';
-import type { Event, EventStats, Pattern, Question, QuestionCount } from './models';
-import { buildQuestion, isEligibleFor, PATTERNS } from './quiz';
+import {
+  PATTERNS,
+  type Event,
+  type EventStats,
+  type Pattern,
+  type Question,
+  type QuestionCount,
+} from './models';
+import { buildQuestion, isEligibleFor } from './quiz';
 import type { Rng } from './random';
 
 /** 「直近 N 日以内に不正解がある」の日数（設計書 7 章の条件 1。境界を含む）。 */
-export const REVIEW_RECENT_WRONG_DAYS = 14;
+const REVIEW_RECENT_WRONG_DAYS = 14;
 
 /** 「正答率が 60% 未満」の判定に使う回答数の下限（設計書 7 章の条件 3）。 */
 const LOW_ACCURACY_MIN_ATTEMPTS = 2;

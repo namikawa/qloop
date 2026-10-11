@@ -20,7 +20,7 @@ export interface RegistrationLike {
 }
 
 /** 判定に使う navigator.serviceWorker の一部。 */
-export interface ServiceWorkerContainerLike {
+interface ServiceWorkerContainerLike {
   /** このページを制御している Service Worker。制御下に無いときは null。 */
   readonly controller: object | null;
 }

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
+  collectCspViolations,
   expectNoHorizontalScroll,
   isYearInputEligible,
   openSetup,
@@ -70,6 +71,7 @@ test('出題設定の出題パターンは 年号入力・年号 4 択・出来�
 });
 
 test('出来事 4 択で 10 問を最後まで回答すると結果画面に着き、ホームへ戻れる', async ({ page }) => {
+  const cspViolations = collectCspViolations(page);
   await openSetup(page);
   await radio(page, '出来事 4 択').check();
   await radio(page, '10 問').check();
@@ -109,11 +111,13 @@ test('出来事 4 択で 10 問を最後まで回答すると結果画面に着�
 
   await page.getByRole('button', { name: 'ホームへ' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'QLoop' })).toBeVisible();
+  expect(cspViolations).toEqual([]);
 });
 
 test('年号入力で正解と不正解を 1 問ずつ答えて終了すると、結果画面に回答済みの分が出て記録が残る', async ({
   page,
 }) => {
+  const cspViolations = collectCspViolations(page);
   const events = readDeckEvents();
   await openSetup(page);
   await radio(page, '年号入力').check();
@@ -169,6 +173,7 @@ test('年号入力で正解と不正解を 1 問ずつ答えて終了すると�
     attempts: 2,
     sessions: [{ answered: 2, correct: 1, total: 10, ended: true }],
   });
+  expect(cspViolations).toEqual([]);
 });
 
 test('出題する出来事は既定が基本の年表のみで、すべてを選ぶと追加データも対象になる', async ({
@@ -313,6 +318,7 @@ test('出来事 4 択で「わからない」を押すと、正解の選択肢�
 test('年号 4 択で正解・不正解・「わからない」を 1 問ずつ答えて終了すると、結果に回答済みの分が出る', async ({
   page,
 }) => {
+  const cspViolations = collectCspViolations(page);
   const events = readDeckEvents();
   await openSetup(page);
   await radio(page, '年号 4 択').check();
@@ -401,4 +407,5 @@ test('年号 4 択で正解・不正解・「わからない」を 1 問ずつ�
     attempts: 3,
     sessions: [{ answered: 3, correct: 1, total: 10, ended: true }],
   });
+  expect(cspViolations).toEqual([]);
 });

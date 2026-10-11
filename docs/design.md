@@ -8,6 +8,7 @@
 - `docs/data.md`: 年表データの手引き（年号の正誤の基準、列の使い分け、データを足す手順、確定した個別の判断）
 - `docs/operations.md`: 運用手順（デプロイ、端末への導入、更新、成績のバックアップ、動作確認の記録）
 - `docs/visual-design.md`: 見た目のデザインの決まりと前提（配色・文字・ロゴ・アイコンの値と、見直すときに渡すもの）
+- `docs/BACKLOG.md`: 新機能と改良の候補（採用して未着手のもの、保留中の候補、見送り）
 
 ## 1. 背景と目的
 
@@ -60,7 +61,7 @@ qloop/
   package.json  vite.config.ts  tsconfig.json  wrangler.jsonc
   playwright.config.ts  eslint.config.js  .prettierrc  .prettierignore
   index.html
-  public/                     manifest 用のアイコン、apple-touch-icon、ホームのロゴ（qloop-logo.svg）
+  public/                     manifest 用のアイコン、apple-touch-icon、ホームのロゴ（qloop-logo.svg）、配信時の応答ヘッダー（_headers）
   data/decks/japanese-history/
     core.csv                  基本の年表（利用者がまとめた初期データ）
     pool.csv                  追加データ（中学受験の範囲。出題と出来事 4 択の誤答に使う）
@@ -86,6 +87,7 @@ qloop/
       transfer.ts             書き出しファイルの形式と検証
     ui/
       App.tsx                 画面の切り替えと全体の状態
+      errors.ts               例外を画面に表示する文字列への変換
       export-file.ts          書き出したファイルの共有とダウンロード
       screens/                Home, QuizSetup, Quiz, Result, ReviewSetup, Stats
       components/             共通部品（帯、横棒、確認ダイアログ、画面の上部、切り替えボタン、下に固定する帯、進み具合の区切り、印）
@@ -115,7 +117,7 @@ CSV の列は次のとおり。`core.csv` と `pool.csv` で同じ形式を使�
 
 | 列 | 必須 | 内容 |
 |---|---|---|
-| `id` | 必須 | 全ファイルを通して一意な文字列。本番データは `jh-0001` の形式、PR 1〜2 の仮データは `demo-0001` の形式。成績はこの id に紐づく（5.5 節の規則に従う） |
+| `id` | 必須 | 全ファイルを通して一意な文字列。本番データは `jh-0001` の形式。成績はこの id に紐づく（5.5 節の規則に従う） |
 | `year` | 必須 | 整数。0 は不可。紀元前は負数（紀元前 4 世紀ごろ → `-350` など代表年。紀元前 4 世紀は紀元前 400〜301 年） |
 | `title` | 必須 | 出来事の文。全ファイルを通して重複不可 |
 | `era` | 任意 | 時代の上書き。空なら `year` から時代区分表で決める |
@@ -140,7 +142,7 @@ CSV の形式: UTF-8（先頭の BOM は許容）、改行は LF と CRLF のど
 
 ### 5.2 検証（`scripts/build-data.ts` とテストで自動確認）
 
-- `id` と `title` が全ファイルを通して一意であること。`id` は `jh-` または `demo-` で始まること。
+- `id` と `title` が全ファイルを通して一意であること。`id` は `jh-` で始まること。
 - `year` が 0 以外の整数であること。`alt_years` が整数で `year` と異なること。
 - `era` に書かれた時代名が時代区分表にあること。`approx` が `1` か空であること。`level` が `中学`・`高校`・空のいずれかであること。
 - `core.csv` の全行（出題対象）について、出来事 4 択の誤答候補が 3 件以上あること（6.3 節の除外規則を適用した後の件数）。
@@ -201,7 +203,7 @@ CSV の形式: UTF-8（先頭の BOM は許容）、改行は LF と CRLF のど
 ### 5.5 id の規則
 
 - id は並べ替え・表記の修正・年の訂正・`core.csv` と `pool.csv` の間の移動で変えない。削除した id は再利用しない。
-- 仮データ（`demo-`）は D1 で削除した。仮データに対する回答は 5.4 節の「存在しない id」として扱われる。
+- 仮データ（`demo-`）は D1 で削除し、id の接頭辞の検証も `jh-` だけにした。仮データに対する回答は 5.4 節の「存在しない id」として扱われる。
 - 利用者の年表を取り込み直す場合は、既存の正本と `title` で照合して差分だけ追加し、全件を振り直さない（`docs/data.md` の 4 章）。
 
 ### 5.6 書き出しと読み込み
@@ -339,7 +341,8 @@ CSV の形式: UTF-8（先頭の BOM は許容）、改行は LF と CRLF のど
 
 - `npm run build`: `scripts/build-data.ts` で CSV を検証して `deck.json` を生成し、Vite でビルドして `dist/` に出す。
 - `npm run deploy`: `npm run build` の後に `wrangler deploy` を実行する。`wrangler.jsonc` は静的アセットの配信だけを定義する（`assets.directory` = `dist`、`not_found_handling` = `single-page-application`）。
-- worker 名は `qloop`。公開 URL は https://qloop.na3.workers.dev（`na3` は Cloudflare アカウントのサブドメイン）。URL を知った人は誰でも使ってよいが、広報はせず、検索エンジンにも載せない。`index.html` に `<meta name="robots" content="noindex">` を置く（`robots.txt` でクロールを拒否すると noindex が読まれず URL だけ載りうるので、`robots.txt` は置かない）。独自ドメインを使う場合は後から足せるが、URL が変わると各端末でホーム画面への再追加と成績の書き出し・読み込みが必要になる。
+- `public/_headers` で配信時の応答ヘッダーを付ける。CSP は同一の配信元だけを許可し、`frame-ancestors 'none'` で埋め込みを禁止する。`X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Referrer-Policy: no-referrer`、`Permissions-Policy: camera=(), microphone=(), geolocation=()`、`X-Robots-Tag: noindex` も付ける。`vite preview` にも同じファイルから読み込んだヘッダーを付け、e2e で CSP 違反がないことを確かめる。開発サーバーには、React Refresh のインラインスクリプトが CSP で止まるため付けない。
+- worker 名は `qloop`。公開 URL は https://qloop.na3.workers.dev（`na3` は Cloudflare アカウントのサブドメイン）。URL を知った人は誰でも使ってよいが、広報はせず、検索エンジンにも載せない。`index.html` に `<meta name="robots" content="noindex">` を置き、応答ヘッダーでも noindex を付ける（`robots.txt` でクロールを拒否すると noindex が読まれず URL だけ載りうるので、`robots.txt` は置かない）。独自ドメインを使う場合は後から足せるが、URL が変わると各端末でホーム画面への再追加と成績の書き出し・読み込みが必要になる。
 - 認証（Cloudflare Access など）は掛けない。配信するのはアプリ本体と年表データだけで、学習データは端末から出ない。
 
 ### 9.3 版の管理
@@ -407,4 +410,4 @@ CSV の形式: UTF-8（先頭の BOM は許容）、改行は LF と CRLF のど
 ## 13. 残作業
 
 - iPhone 7（iOS 15.8）での実機確認。動作保証の下限なので、`docs/operations.md` の 6 章の手順で確かめる。
-- `scripts/build-data.ts` の実行ログの文言（「誤答用」のまま）を直す。Lighthouse の PWA 項目を確認する。
+- Lighthouse の PWA 項目を確認する。

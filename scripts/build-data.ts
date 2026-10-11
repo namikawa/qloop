@@ -31,5 +31,9 @@ mkdirSync(dirname(outPath), { recursive: true });
 writeFileSync(outPath, `${JSON.stringify(result.deck, null, 2)}\n`);
 
 const core = result.deck.events.filter((event) => event.role === 'core').length;
-const pool = result.deck.events.length - core;
-console.log(`${relative(root, outPath)} を書きました（出題対象 ${core} 件、誤答用 ${pool} 件）`);
+const pool = result.deck.events.filter((event) => event.role === 'pool').length;
+const highSchool = result.deck.events.filter((event) => event.level === '高校').length;
+const targets = result.deck.events.filter((event) => event.level === '中学').length;
+console.log(
+  `${relative(root, outPath)} を書きました: 基本の年表 ${core} 件、追加データ ${pool} 件（うち高校 ${highSchool} 件）、出題対象 ${targets} 件`,
+);

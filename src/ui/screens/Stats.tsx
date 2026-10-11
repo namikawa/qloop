@@ -19,6 +19,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ChevronDownIcon, ExportIcon, ImportIcon, TrashIcon } from '../components/icons';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { Segmented } from '../components/Segmented';
+import { describeError } from '../errors';
 import {
   prepareExportFile,
   releaseExportFile,
@@ -52,13 +53,6 @@ interface StatsProps {
 interface Notice {
   kind: 'info' | 'error';
   text: string;
-}
-
-function describeError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message !== '' ? error.message : error.name;
-  }
-  return String(error);
 }
 
 /** `formatAccuracy` の表示（`67%` か `未回答`）の % を小さく見せる。 */

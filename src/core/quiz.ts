@@ -1,11 +1,12 @@
-import type {
-  Deck,
-  Event,
-  EventScope,
-  Pattern,
-  PatternMode,
-  Question,
-  QuestionCount,
+import {
+  PATTERNS,
+  type Deck,
+  type Event,
+  type EventScope,
+  type Pattern,
+  type PatternMode,
+  type Question,
+  type QuestionCount,
 } from './models';
 import { randomInt, shuffle, type Rng } from './random';
 
@@ -13,16 +14,13 @@ import { randomInt, shuffle, type Rng } from './random';
 export const CHOICE_DISTRACTOR_COUNT = 3;
 
 /** 年号 4 択の誤答の年を選ぶ範囲（正解の前後 1 年からこの年数まで。設計書 6.7 節）。 */
-export const YEAR_CHOICE_SPREAD = 10;
-
-/** 出題パターンの並び（年号入力・年号 4 択・出来事 4 択）。ミックスはこの中から選ぶ。 */
-export const PATTERNS: readonly Pattern[] = ['yearInput', 'yearChoice', 'choice'];
+const YEAR_CHOICE_SPREAD = 10;
 
 /** `approx` の出来事が絡むとき、誤答の候補から外す年の差（この年数以内は除外）。 */
 const APPROX_EXCLUSION_YEARS = 50;
 
 /** 誤答を優先して選ぶ年の差（出題年の前後この年数以内を優先する。境界を含む）。 */
-export const CHOICE_NEAR_YEARS = 100;
+const CHOICE_NEAR_YEARS = 100;
 
 /**
  * 出題の母集団（設計書 6.1 節の 1）: `level` が `中学` の出来事（`core.csv` と `pool.csv` の両方）。
@@ -116,7 +114,7 @@ export function eligibleQuestions(
 const choiceEligibilityCache = new WeakMap<readonly Event[], Map<string, boolean>>();
 
 /** `isChoiceEligible` の結果を `allEvents` の配列ごとに覚えておく版（出題設定と復習の候補選定で使う）。 */
-export function isChoiceEligibleCached(event: Event, allEvents: readonly Event[]): boolean {
+function isChoiceEligibleCached(event: Event, allEvents: readonly Event[]): boolean {
   let cache = choiceEligibilityCache.get(allEvents);
   if (cache === undefined) {
     cache = new Map();

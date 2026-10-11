@@ -2,7 +2,7 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Attempt, EventStats, Pattern, Session, Settings } from '../core/models';
 
 /** データベース名と版（設計書 5.4 節）。スキーマを変えるときは版を上げ、`upgrade` に移行を書く。 */
-export const DB_NAME = 'qloop';
+const DB_NAME = 'qloop';
 export const DB_VERSION = 1;
 
 /**
@@ -11,7 +11,7 @@ export const DB_VERSION = 1;
 export type StoredSettings = Omit<Settings, 'scope'> & Partial<Pick<Settings, 'scope'>>;
 
 /** `meta` ストアのレコード。`key` で種類を分ける。 */
-export type MetaRecord =
+type MetaRecord =
   | { key: 'settings'; value: StoredSettings }
   /** 回答のあった端末ローカルの暦日（`YYYY-MM-DD`）。昇順で重複なし。 */
   | { key: 'studyDays'; value: string[] };

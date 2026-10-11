@@ -11,13 +11,13 @@
  * エラーは止まらずに全行分を集めて返す。`rows` には正しく読めた行だけが入る。
  */
 
-export interface CsvRow {
+interface CsvRow {
   /** ファイル内の行番号（1 始まり。ヘッダーが 1 行目）。 */
   line: number;
   cells: string[];
 }
 
-export interface CsvError {
+interface CsvError {
   line: number;
   message: string;
 }

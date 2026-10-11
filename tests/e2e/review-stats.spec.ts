@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import {
+  collectCspViolations,
   expectNoHorizontalScroll,
   isYearInputEligible,
   openSetup,
@@ -330,6 +331,7 @@ test('リセットは確認の後に記録を消す（取り消せば消さな�
 test('書き出しは、ファイル共有が使えなければダウンロードのリンクで JSON を保存する', async ({
   page,
 }) => {
+  const cspViolations = collectCspViolations(page);
   await page.addInitScript(() => {
     Object.defineProperty(Navigator.prototype, 'canShare', {
       value: undefined,
@@ -355,6 +357,7 @@ test('書き出しは、ファイル共有が使えなければダウンロー�
   expect(saved.schemaVersion).toBe(1);
   expect(saved.attempts).toHaveLength(1);
   expect(saved.sessions.map((session) => session.answered)).toEqual([1]);
+  expect(cspViolations).toEqual([]);
 });
 
 test('書き出しをもう一度押すと準備した欄を閉じ、また押すと作り直して保存できる', async ({

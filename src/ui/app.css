@@ -58,7 +58,6 @@
   --font-family:
     -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
     sans-serif;
-  --font-weight-regular: 400; /* W3 */
   --font-weight-semibold: 600; /* W6 */
   --font-weight-bold: 700; /* W7 */
   --font-size-review-count: 44px; /* 復習の件数 */
