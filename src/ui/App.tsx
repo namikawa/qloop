@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
+import { localDateKey } from '../core/date';
 import type { Deck, Question, Session } from '../core/models';
 import { population } from '../core/quiz';
+import { reviewCandidates } from '../core/review';
+import { streakDays } from '../core/stats';
 import deckJson from '../generated/deck.json';
 import { shouldShowInstallBanner } from '../pwa/standalone';
 import { useAppUpdate } from '../pwa/update';
@@ -129,6 +132,8 @@ export function App() {
     return <Result result={view.result} onHome={() => setView({ screen: 'home' })} />;
   }
 
+  // ホームの連続学習日数と復習の件数。復習の件数は復習の画面と同じ数え方
+  const now = new Date();
   return (
     <Home
       deckName={deck.name}
@@ -136,6 +141,17 @@ export function App() {
       coreCount={coreCount}
       version={__APP_VERSION__}
       storeStatus={storeState}
+      streakDays={store === null ? null : streakDays(store.getStudyDays(), localDateKey(now))}
+      reviewCount={
+        store === null
+          ? null
+          : reviewCandidates({
+              population: targets,
+              allEvents: deck.events,
+              stats: store.listEventStats(),
+              now,
+            }).length
+      }
       onStartQuiz={() => setView({ screen: 'setup' })}
       onStartReview={() => setView({ screen: 'review-setup' })}
       onOpenStats={() => setView({ screen: 'stats' })}

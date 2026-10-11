@@ -1,5 +1,9 @@
+import { progressSteps } from '../../core/progress';
 import { formatAnswerYears } from '../../core/year';
 import { Banner } from '../components/Banner';
+import { BottomBar } from '../components/BottomBar';
+import { ProgressSteps } from '../components/ProgressSteps';
+import { ScreenHeader } from '../components/ScreenHeader';
 import type { QuizResult } from './Quiz';
 
 interface ResultProps {
@@ -7,39 +11,87 @@ interface ResultProps {
   onHome: () => void;
 }
 
+/** 輪のグラフの半径と線の太さ（112px の正方形の中央に描く）。 */
+const RING_RADIUS = 48;
+const RING_STROKE = 10;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+/** 正答の割合を緑の弧で示す輪（上から時計回り）。数は中央の文字で示すので、読み上げからは外す。 */
+function ScoreRing({ ratio }: { ratio: number }) {
+  return (
+    <svg width="112" height="112" viewBox="0 0 112 112" aria-hidden="true" focusable="false">
+      <circle
+        cx="56"
+        cy="56"
+        r={RING_RADIUS}
+        fill="none"
+        stroke="var(--color-bar-track)"
+        strokeWidth={RING_STROKE}
+      />
+      {ratio > 0 && (
+        <circle
+          cx="56"
+          cy="56"
+          r={RING_RADIUS}
+          fill="none"
+          stroke="var(--color-correct)"
+          strokeWidth={RING_STROKE}
+          strokeLinecap="round"
+          strokeDasharray={`${ratio * RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`}
+          transform="rotate(-90 56 56)"
+        />
+      )}
+    </svg>
+  );
+}
+
 /** まとめの画面（設計書 6.4 節の 6）。正答数 / 回答済み数と、間違えた出来事の一覧を出す。 */
 export function Result({ result, onHome }: ResultProps) {
   const answered = result.answers.length;
-  const correct = result.answers.filter((answer) => answer.correct).length;
-  const wrong = result.answers.filter((answer) => !answer.correct);
+  const correct = result.answers.filter((answer) => answer.outcome === 'correct').length;
+  const wrong = result.answers.filter((answer) => answer.outcome !== 'correct');
+  // 出題中の区切りと同じ判定の列。問題数が多いときは出さない
+  const steps = progressSteps(
+    result.total,
+    result.answers.map((answer) => answer.outcome),
+    null,
+  );
+  const longScore = `${correct}${answered}`.length > 4;
 
   return (
-    <div className="screen">
+    <div className="screen screen-with-bar result-screen">
       {result.saveFailed && <Banner>保存に失敗した記録があります</Banner>}
 
-      <header className="screen-header">
-        <h1 className="screen-title">結果</h1>
-      </header>
+      <ScreenHeader title="結果" />
 
-      <main className="result">
-        <section className="result-summary">
-          <p className="result-score" data-testid="result-score">
-            {correct} / {answered}
-          </p>
+      <main className="result screen-body">
+        <section className="card result-card" aria-label="得点">
+          <div className="score-ring">
+            <ScoreRing ratio={answered === 0 ? 0 : correct / answered} />
+            <p
+              className={longScore ? 'result-score long' : 'result-score'}
+              data-testid="result-score"
+            >
+              {correct}
+              <span className="result-slash"> / </span>
+              {answered}
+            </p>
+          </div>
           <p className="result-caption">正答数 / 回答済み数</p>
+          {steps !== null && <ProgressSteps steps={steps} className="result-steps" />}
           <p className="result-total" data-testid="result-total">
             予定の問題数 {result.total} 問{answered < result.total && '（途中で終了）'}
           </p>
         </section>
 
-        <section className="result-wrong" aria-labelledby="result-wrong-title">
-          <h2 id="result-wrong-title" className="section-title">
+        <section aria-labelledby="result-wrong-title">
+          <h2 id="result-wrong-title" className="section-label">
             間違えた出来事
           </h2>
           {wrong.length === 0 ? (
-            <p className="status-text">ありません</p>
+            <p className="empty-text">ありません</p>
           ) : (
-            <ul className="wrong-list" data-testid="wrong-list">
+            <ul className="card card-flat list-card" data-testid="wrong-list">
               {wrong.map((answer) => (
                 // 復習では同じ出来事が 2 つのパターンで出ることがあるので、パターンも key に含める
                 <li key={`${answer.pattern}:${answer.event.id}`} className="wrong-item">
@@ -50,11 +102,13 @@ export function Result({ result, onHome }: ResultProps) {
             </ul>
           )}
         </section>
+      </main>
 
+      <BottomBar>
         <button type="button" className="button-primary" onClick={onHome}>
           ホームへ
         </button>
-      </main>
+      </BottomBar>
     </div>
   );
 }

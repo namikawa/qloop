@@ -2,6 +2,9 @@ import { useState } from 'react';
 import type { Event, Question, QuestionCount, Session } from '../../core/models';
 import { generateReviewSession, reviewCandidates } from '../../core/review';
 import type { ProgressStore } from '../../storage/progress-store';
+import { BottomBar } from '../components/BottomBar';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { Segmented } from '../components/Segmented';
 import { COUNT_OPTIONS } from './QuizSetup';
 
 interface ReviewSetupProps {
@@ -65,57 +68,51 @@ export function ReviewSetup({ store, population, allEvents, onStart, onBack }: R
   };
 
   return (
-    <div className="screen">
-      <header className="screen-header">
-        <button type="button" className="button-text" onClick={onBack}>
-          ‹ 戻る
-        </button>
-        <h1 className="screen-title">復習</h1>
-      </header>
+    <div className="screen screen-with-bar">
+      <ScreenHeader title="復習" onBack={onBack} />
 
-      <main className="setup">
-        <section className="review-summary">
-          <p className="review-count" data-testid="review-count">
-            {candidateCount === 0
-              ? '復習する問題はありません'
-              : `復習する問題は ${candidateCount} 件`}
-          </p>
+      <main className="setup screen-body">
+        <section className="card review-card" aria-labelledby="review-card-label">
+          <h2 id="review-card-label" className="review-card-label">
+            復習する問題
+          </h2>
+          {candidateCount === 0 ? (
+            <p className="review-count-empty" data-testid="review-count">
+              復習する問題はありません
+            </p>
+          ) : (
+            <p className="review-count" data-testid="review-count">
+              <span className="review-count-number">{candidateCount}</span>
+              <span className="review-count-unit"> 件</span>
+            </p>
+          )}
           <p className="hint">最近間違えた問題や、正答率の低い問題を出します。</p>
         </section>
 
-        <fieldset className="field">
-          <legend className="field-legend">問題数</legend>
-          <div className="options options-3">
-            {COUNT_OPTIONS.map((option) => (
-              <label key={option.value} className="option">
-                <input
-                  type="radio"
-                  name="count"
-                  checked={count === option.value}
-                  onChange={() => setCount(option.value)}
-                />
-                <span>{option.label}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
-        <div className="setup-footer">
-          {startError !== null && (
-            <p className="error-text" role="alert">
-              {startError}
-            </p>
-          )}
-          <button
-            type="button"
-            className="button-primary"
-            disabled={candidateCount === 0 || starting}
-            onClick={() => void handleStart()}
-          >
-            開始
-          </button>
-        </div>
+        <Segmented
+          legend="問題数"
+          name="count"
+          options={COUNT_OPTIONS}
+          value={count}
+          onChange={setCount}
+        />
       </main>
+
+      <BottomBar>
+        {startError !== null && (
+          <p className="error-text" role="alert">
+            {startError}
+          </p>
+        )}
+        <button
+          type="button"
+          className="button-primary"
+          disabled={candidateCount === 0 || starting}
+          onClick={() => void handleStart()}
+        >
+          開始
+        </button>
+      </BottomBar>
     </div>
   );
 }

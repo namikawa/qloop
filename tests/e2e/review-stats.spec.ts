@@ -63,6 +63,16 @@ function eventRowTitles(page: Page) {
   return page.getByTestId('event-row').locator('.event-row-title');
 }
 
+/** 成績の画面の表示（全体・出来事別・履歴）を切り替える。 */
+async function showStatsView(page: Page, name: '全体' | '出来事別' | '履歴'): Promise<void> {
+  await radio(page, name).check();
+  await expect(radio(page, name)).toBeChecked();
+}
+
+function sortSelect(page: Page) {
+  return page.getByRole('combobox', { name: '並べ替え' });
+}
+
 test('年号入力で不正解を作ると復習に候補が出て、復習を進めると結果に着く', async ({ page }) => {
   // 記録が無いときは候補が無く、開始できない
   await page.goto('/');
@@ -70,12 +80,12 @@ test('年号入力で不正解を作ると復習に候補が出て、復習を�
   await expect(page.getByTestId('review-count')).toHaveText('復習する問題はありません');
   await expect(page.getByRole('button', { name: '開始' })).toBeDisabled();
   await expectNoHorizontalScroll(page);
-  await page.getByRole('button', { name: '‹ 戻る' }).click();
+  await page.getByRole('button', { name: '戻る', exact: true }).click();
 
   const [wrong] = await answerYearInputs(page, [false]);
 
   await openReview(page);
-  await expect(page.getByTestId('review-count')).toHaveText('復習する問題は 1 件');
+  await expect(page.getByTestId('review-count')).toHaveText('1 件');
   await expect(radio(page, '10 問')).toBeChecked();
   await expectNoHorizontalScroll(page);
   await page.getByRole('button', { name: '開始' }).click();
@@ -95,25 +105,35 @@ test('年号入力で不正解を作ると復習に候補が出て、復習を�
   // 正解した後も、直近 14 日以内に不正解があるので候補に残る
   await page.getByRole('button', { name: 'ホームへ' }).click();
   await openReview(page);
-  await expect(page.getByTestId('review-count')).toHaveText('復習する問題は 1 件');
+  await expect(page.getByTestId('review-count')).toHaveText('1 件');
 
   // 復習のセッションも履歴に残る
-  await page.getByRole('button', { name: '‹ 戻る' }).click();
+  await page.getByRole('button', { name: '戻る', exact: true }).click();
   await openStats(page);
+  await expect(page.getByTestId('overall-attempts')).toHaveText('2 回');
+  await showStatsView(page, '履歴');
   await expect(page.getByTestId('history-item')).toHaveCount(2);
   await expect(page.getByTestId('history-item').first()).toContainText('復習');
   await expect(page.getByTestId('history-item').first()).toContainText('1 / 1');
-  await expect(page.getByTestId('overall-attempts')).toHaveText('2 回');
 });
 
-test('成績画面に 4 区分が出て、出来事別の並べ替えと内訳の開閉が動く', async ({ page }) => {
+test('成績画面は 全体・出来事別・履歴 を切り替えて出し、出来事別の並べ替えと内訳の開閉が動く', async ({
+  page,
+}) => {
   const population = populationOf(readDeckEvents());
   const [wrong, right] = await answerYearInputs(page, [false, true]);
   await openStats(page);
 
-  for (const name of ['全体', '時代別', '出来事別', '履歴', '記録の管理']) {
+  // 初めは「全体」。全体・時代別・記録の管理を出し、出来事別と履歴は出さない
+  const views = page.getByRole('group', { name: '成績の表示' });
+  await expect(views.getByRole('radio')).toHaveCount(3);
+  await expect(views.locator('label')).toHaveText(['全体', '出来事別', '履歴']);
+  await expect(radio(page, '全体')).toBeChecked();
+  for (const name of ['時代別', '記録の管理']) {
     await expect(page.getByRole('heading', { level: 2, name, exact: true })).toBeVisible();
   }
+  await expect(page.getByTestId('event-row')).toHaveCount(0);
+  await expect(page.getByTestId('history-item')).toHaveCount(0);
   await expectNoHorizontalScroll(page);
 
   // 全体
@@ -131,17 +151,25 @@ test('成績画面に 4 区分が出て、出来事別の並べ替えと内訳�
   }
 
   // 出来事別: 母集団の出来事ごとに 1 行。既定は正答率の低い順
+  await showStatsView(page, '出来事別');
+  await expect(page.getByTestId('era-row')).toHaveCount(0);
   await expect(page.getByTestId('event-row')).toHaveCount(population.length);
-  await expect(radio(page, '正答率の低い順')).toBeChecked();
+  await expect(sortSelect(page)).toHaveValue('accuracy');
+  await expect(sortSelect(page).locator('option')).toHaveText([
+    '正答率の低い順',
+    '回答数の多い順',
+    '最終回答日の新しい順',
+  ]);
   await expect(eventRowTitles(page).nth(0)).toHaveText(wrong.title);
   await expect(eventRowTitles(page).nth(1)).toHaveText(right.title);
+  await expectNoHorizontalScroll(page);
 
-  await radio(page, '最終回答日の新しい順').check();
+  await sortSelect(page).selectOption('recent');
   await expect(eventRowTitles(page).nth(0)).toHaveText(right.title);
   await expect(eventRowTitles(page).nth(1)).toHaveText(wrong.title);
 
   // 回答数はどちらも 1 回なので id 順
-  await radio(page, '回答数の多い順').check();
+  await sortSelect(page).selectOption('attempts');
   const [first, second] = [wrong, right].sort((a, b) => (a.id < b.id ? -1 : 1));
   await expect(eventRowTitles(page).nth(0)).toHaveText(first.title);
   await expect(eventRowTitles(page).nth(1)).toHaveText(second.title);
@@ -160,11 +188,18 @@ test('成績画面に 4 区分が出て、出来事別の並べ替えと内訳�
   await expect(row.getByTestId('breakdown')).toHaveCount(0);
 
   // 履歴
+  await showStatsView(page, '履歴');
+  await expect(page.getByTestId('event-row')).toHaveCount(0);
   const history = page.getByTestId('history-item');
   await expect(history).toHaveCount(1);
   await expect(history).toContainText('通常 · 全範囲 · 年号入力');
   await expect(history).toContainText('1 / 2');
   await expect(history).not.toContainText('中断');
+  await expectNoHorizontalScroll(page);
+
+  // 全体に戻すと、全体の数字をまた出す
+  await showStatsView(page, '全体');
+  await expect(page.getByTestId('overall-attempts')).toHaveText('2 回');
 });
 
 /** 母集団のうち、年号入力に出せる最初の出来事。 */
@@ -247,16 +282,18 @@ test('JSON を読み込むと確認の後に記録が置き換わり、形式が
   await expect(page.getByTestId('overall-attempts')).toHaveText('3 回');
   await expect(page.getByTestId('overall-accuracy')).toHaveText('33%');
   await expect(page.getByTestId('overall-streak')).toHaveText('1 日');
+  await showStatsView(page, '履歴');
   const history = page.getByTestId('history-item');
   await expect(history).toHaveCount(1);
   await expect(history).toContainText('通常 · 700年〜1600年 · 年号入力');
   await expect(history).toContainText('1 / 3');
+  await showStatsView(page, '出来事別');
   await expect(eventRowTitles(page).first()).toHaveText(target.title);
 
   // 再起動しても読み込んだ記録が残り、復習の候補にもなる
   await page.reload();
   await openReview(page);
-  await expect(page.getByTestId('review-count')).toHaveText('復習する問題は 1 件');
+  await expect(page.getByTestId('review-count')).toHaveText('1 件');
 });
 
 test('リセットは確認の後に記録を消す（取り消せば消さない）', async ({ page }) => {
@@ -278,13 +315,14 @@ test('リセットは確認の後に記録を消す（取り消せば消さな�
   await expect(page.getByTestId('overall-attempts')).toHaveText('0 回');
   await expect(page.getByTestId('overall-accuracy')).toHaveText('未回答');
   await expect(page.getByTestId('overall-streak')).toHaveText('0 日');
+  await showStatsView(page, '履歴');
   await expect(page.getByTestId('history-empty')).toBeVisible();
 
   // 再起動しても消えたまま
   await page.reload();
   await openStats(page);
   await expect(page.getByTestId('overall-attempts')).toHaveText('0 回');
-  await page.getByRole('button', { name: '‹ 戻る' }).click();
+  await page.getByRole('button', { name: '戻る', exact: true }).click();
   await openReview(page);
   await expect(page.getByTestId('review-count')).toHaveText('復習する問題はありません');
 });
@@ -319,6 +357,40 @@ test('書き出しは、ファイル共有が使えなければダウンロー�
   expect(saved.sessions.map((session) => session.answered)).toEqual([1]);
 });
 
+test('書き出しをもう一度押すと準備した欄を閉じ、また押すと作り直して保存できる', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'canShare', {
+      value: undefined,
+      configurable: true,
+    });
+  });
+  await answerYearInputs(page, [false]);
+  await openStats(page);
+  const exportButton = page.getByRole('button', { name: '書き出し' });
+  await expect(exportButton).toHaveAttribute('aria-expanded', 'false');
+  await exportButton.click();
+  await expect(page.getByTestId('export-ready')).toBeVisible();
+  await expect(exportButton).toHaveAttribute('aria-expanded', 'true');
+
+  // もう一度押すと閉じる
+  await exportButton.click();
+  await expect(page.getByTestId('export-ready')).toHaveCount(0);
+  await expect(exportButton).toHaveAttribute('aria-expanded', 'false');
+
+  // また押すと作り直し、閉じる前の URL を解放していても保存できる
+  await exportButton.click();
+  await expect(page.getByTestId('export-ready')).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'ファイルを保存' }).click();
+  const download = await downloadPromise;
+  const saved = JSON.parse(readFileSync(await download.path(), 'utf8')) as {
+    attempts: unknown[];
+  };
+  expect(saved.attempts).toHaveLength(1);
+});
+
 test('書き出しは、共有に失敗したらダウンロードのリンクに切り替わり、そこから保存できる', async ({
   page,
 }) => {
@@ -348,6 +420,11 @@ test('書き出しは、共有に失敗したらダウンロードのリンク�
     attempts: unknown[];
   };
   expect(saved.attempts).toHaveLength(1);
+
+  // 「書き出し」で欄を閉じると、「ファイルを保存」への案内も消える
+  await page.getByRole('button', { name: '書き出し' }).click();
+  await expect(page.getByTestId('export-ready')).toHaveCount(0);
+  await expect(page.getByTestId('stats-notice')).toHaveCount(0);
 });
 
 test('書き出しは、ファイル共有が使えれば共有のシートで JSON を渡す', async ({ page }) => {
