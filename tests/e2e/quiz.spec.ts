@@ -47,9 +47,31 @@ function readSavedProgress(page: Page): Promise<SavedProgress> {
   });
 }
 
-test('4 択で 10 問を最後まで回答すると結果画面に着き、ホームへ戻れる', async ({ page }) => {
+test('出題設定の出題パターンは 年号入力・年号 4 択・出来事 4 択・ミックス の 4 つで、既定は年号入力', async ({
+  page,
+}) => {
   await openSetup(page);
-  await radio(page, '4 択').check();
+  const group = page.getByRole('group', { name: '出題パターン' });
+  await expect(group.getByRole('radio')).toHaveCount(4);
+  await expect(group.locator('label')).toHaveText([
+    '年号入力',
+    '年号 4 択',
+    '出来事 4 択',
+    'ミックス',
+  ]);
+  await expect(radio(page, '年号入力')).toBeChecked();
+  await expectNoHorizontalScroll(page);
+  // どのパターンを選んでも対象の件数が出て、開始できる
+  for (const name of ['年号 4 択', '出来事 4 択', 'ミックス', '年号入力']) {
+    await radio(page, name).check();
+    await expect(page.getByTestId('eligible-count')).toHaveText(/^対象 [1-9]\d* 件$/);
+    await expect(page.getByRole('button', { name: '開始' })).toBeEnabled();
+  }
+});
+
+test('出来事 4 択で 10 問を最後まで回答すると結果画面に着き、ホームへ戻れる', async ({ page }) => {
+  await openSetup(page);
+  await radio(page, '出来事 4 択').check();
   await radio(page, '10 問').check();
   await radio(page, '全範囲').check();
   await expect(page.getByTestId('eligible-count')).toHaveText(/^対象 \d+ 件$/);
@@ -220,4 +242,163 @@ test('再読み込みすると、出題設定の初期値が前回開始した�
   await expect(page.getByTestId('eligible-count')).toHaveText(/^対象 \d+ 件$/);
   await expect(start).toBeEnabled();
   await expectNoHorizontalScroll(page);
+});
+
+test('年号入力で「わからない」を押すと、不正解として記録し、答えを見せて先へ進める', async ({
+  page,
+}) => {
+  const events = readDeckEvents();
+  await openSetup(page);
+  await radio(page, '年号入力').check();
+  await radio(page, '10 問').check();
+  await radio(page, '全範囲').check();
+  await page.getByRole('button', { name: '開始' }).click();
+
+  // 何も入力していなくても押せる
+  await expect(page.getByTestId('progress')).toHaveText('1 / 10');
+  const title = await page.locator('.question-text').textContent();
+  const event = events.find((candidate) => candidate.title === title);
+  expect(event).toBeDefined();
+  await expect(page.getByRole('button', { name: '回答' })).toBeDisabled();
+  await expectNoHorizontalScroll(page);
+  await page.getByRole('button', { name: 'わからない' }).click();
+
+  await expect(page.getByTestId('judgement')).toHaveText('わからない');
+  await expect(page.getByText(/^正解の年: /)).toContainText(`${event?.year}年`);
+  await expect(page.getByRole('textbox', { name: '年号' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'わからない' })).toHaveCount(0);
+  await page.getByRole('button', { name: '次へ' }).click();
+  await expect(page.getByTestId('progress')).toHaveText('2 / 10');
+  await expect(page.getByRole('button', { name: 'わからない' })).toBeVisible();
+
+  // 終了すると、わからなかった問題は間違えた出来事に入り、不正解として残る
+  await page.getByRole('button', { name: '終了', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '終了する' }).click();
+  await expect(page.getByTestId('result-score')).toHaveText('0 / 1');
+  await expect(page.getByTestId('wrong-list').getByRole('listitem')).toHaveCount(1);
+  expect(await readSavedProgress(page)).toEqual({
+    attempts: 1,
+    sessions: [{ answered: 1, correct: 0, total: 10, ended: true }],
+  });
+
+  // 復習の候補にもなる
+  await page.getByRole('button', { name: 'ホームへ' }).click();
+  await page.getByRole('button', { name: '復習', exact: true }).click();
+  await expect(page.getByTestId('review-count')).toHaveText('復習する問題は 1 件');
+});
+
+test('出来事 4 択で「わからない」を押すと、正解の選択肢を示して先へ進める', async ({ page }) => {
+  await openSetup(page);
+  await radio(page, '出来事 4 択').check();
+  await radio(page, '10 問').check();
+  await radio(page, '全範囲').check();
+  await page.getByRole('button', { name: '開始' }).click();
+
+  await expect(page.getByTestId('progress')).toHaveText('1 / 10');
+  await expectNoHorizontalScroll(page);
+  await page.getByRole('button', { name: 'わからない' }).click();
+
+  await expect(page.getByTestId('judgement')).toHaveText('わからない');
+  // 正解だけを強調し、「選んだ答え」は出さない
+  await expect(page.locator('.choice.correct')).toHaveCount(1);
+  await expect(page.locator('.choice.wrong')).toHaveCount(0);
+  for (const choice of await page.getByTestId('choice').all()) {
+    await expect(choice).toBeDisabled();
+  }
+  await expect(page.getByRole('button', { name: 'わからない' })).toHaveCount(0);
+  await page.getByRole('button', { name: '次へ' }).click();
+  await expect(page.getByTestId('progress')).toHaveText('2 / 10');
+});
+
+test('年号 4 択で正解・不正解・「わからない」を 1 問ずつ答えて終了すると、結果に回答済みの分が出る', async ({
+  page,
+}) => {
+  const events = readDeckEvents();
+  await openSetup(page);
+  await radio(page, '年号 4 択').check();
+  await radio(page, '10 問').check();
+  await radio(page, '全範囲').check();
+  await page.getByRole('button', { name: '開始' }).click();
+
+  const choices = page.getByTestId('year-choice');
+  const yearButton = (year: number) => page.getByRole('button', { name: `${year}年`, exact: true });
+
+  /** 表示中の出来事を探し、年号の選択肢の決まり（小さい順、正解を含む、前後 10 年以内、別解を含まない）を確かめる。 */
+  async function currentQuestion(): Promise<{ year: number; years: number[] }> {
+    const title = await page.locator('.question-text').textContent();
+    const event = events.find((candidate) => candidate.title === title);
+    expect(event).toBeDefined();
+    const year = event?.year ?? NaN;
+    await expect(page.getByText('何年の出来事？')).toBeVisible();
+    await expect(choices).toHaveCount(4);
+    const texts = await choices.allTextContents();
+    expect(texts.every((text) => /^\d+年$/.test(text))).toBe(true);
+    const years = texts.map((text) => Number(text.replace('年', '')));
+    expect(years).toEqual([...years].sort((a, b) => a - b));
+    expect(new Set(years).size).toBe(4);
+    expect(years).toContain(year);
+    for (const choice of years.filter((candidate) => candidate !== year)) {
+      expect(Math.abs(choice - year)).toBeLessThanOrEqual(10);
+      expect(event?.altYears).not.toContain(choice);
+    }
+    return { year, years };
+  }
+
+  async function expectLocked(): Promise<void> {
+    for (const choice of await choices.all()) {
+      await expect(choice).toBeDisabled();
+    }
+    await expect(page.getByRole('button', { name: 'わからない' })).toHaveCount(0);
+  }
+
+  // 1 問目: 正解の年を選ぶ
+  await expect(page.getByTestId('progress')).toHaveText('1 / 10');
+  await expectNoHorizontalScroll(page);
+  const first = await currentQuestion();
+  await yearButton(first.year).click();
+  await expect(page.getByTestId('judgement')).toHaveText('正解');
+  await expect(page.getByText(/^正解の年: /)).toContainText(`${first.year}年`);
+  await expect(page.locator('.choice.correct')).toHaveCount(1);
+  await expect(page.locator('.choice.correct')).toContainText(`${first.year}年`);
+  await expect(page.locator('.choice.wrong')).toHaveCount(0);
+  await expectLocked();
+  await expectNoHorizontalScroll(page);
+  await page.getByRole('button', { name: '次へ' }).click();
+
+  // 2 問目: 違う年を選ぶ
+  await expect(page.getByTestId('progress')).toHaveText('2 / 10');
+  const second = await currentQuestion();
+  const wrongYear = second.years.find((year) => year !== second.year) ?? NaN;
+  await yearButton(wrongYear).click();
+  await expect(page.getByTestId('judgement')).toHaveText('不正解');
+  await expect(page.getByText(/^正解の年: /)).toContainText(`${second.year}年`);
+  await expect(page.locator('.choice.correct')).toContainText(`${second.year}年`);
+  await expect(page.locator('.choice.wrong')).toHaveCount(1);
+  await expect(page.locator('.choice.wrong')).toContainText(`${wrongYear}年`);
+  await expect(page.locator('.choice.wrong')).toContainText('選んだ答え');
+  await expectLocked();
+  await expectNoHorizontalScroll(page);
+  await page.getByRole('button', { name: '次へ' }).click();
+
+  // 3 問目: 「わからない」を押す
+  await expect(page.getByTestId('progress')).toHaveText('3 / 10');
+  const third = await currentQuestion();
+  await page.getByRole('button', { name: 'わからない' }).click();
+  await expect(page.getByTestId('judgement')).toHaveText('わからない');
+  await expect(page.getByText(/^正解の年: /)).toContainText(`${third.year}年`);
+  await expect(page.locator('.choice.correct')).toContainText(`${third.year}年`);
+  await expect(page.locator('.choice.wrong')).toHaveCount(0);
+  await expectLocked();
+
+  // 終了すると、結果に回答済みの 3 問が出て、記録が残る
+  await page.getByRole('button', { name: '終了', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '終了する' }).click();
+  await expect(page.getByRole('heading', { name: '結果' })).toBeVisible();
+  await expect(page.getByTestId('result-score')).toHaveText('1 / 3');
+  await expect(page.getByTestId('result-total')).toHaveText('予定の問題数 10 問（途中で終了）');
+  await expect(page.getByTestId('wrong-list').getByRole('listitem')).toHaveCount(2);
+  expect(await readSavedProgress(page)).toEqual({
+    attempts: 3,
+    sessions: [{ answered: 3, correct: 1, total: 10, ended: true }],
+  });
 });

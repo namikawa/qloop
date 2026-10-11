@@ -54,12 +54,15 @@ function st(eventId: string, pattern: Pattern, extra: Partial<EventStats> = {}):
   };
 }
 
-/** 年の離れた出来事を `count` 件作る（どれも年号入力と 4 択の両方に適格）。 */
+/** 年の離れた出来事を `count` 件作る（どれも 3 つのパターンすべてに適格）。 */
 function spread(count: number, prefix = 'e'): Event[] {
   return Array.from({ length: count }, (_, i) => ev(`${prefix}${i + 1}`, 1000 + i * 10));
 }
 
 const SEEDS = Array.from({ length: 40 }, (_, i) => i + 1);
+
+/** テストで使う今年。 */
+const CURRENT_YEAR = 2026;
 
 describe('needsReview', () => {
   /** 条件 1 だけを確かめるための集計（最後は正解、正答率 90%）。 */
@@ -151,7 +154,7 @@ describe('reviewCandidates', () => {
   const pooled = ev('pooled', 1700, { role: 'pool' });
   const high = ev('high', 1650, { level: '高校' });
   const approx = ev('approx', 1500, { approx: true });
-  // 誤答の候補が 2 件しかない（4 択に適格でない）出来事。年号入力には適格
+  // 誤答の候補が 2 件しかない（出来事 4 択に適格でない）出来事。年号入力と年号 4 択には適格
   const lonelyAll = [ev('lonely', 1800), ev('x1', 1801), ev('x2', 1802)];
   const deck = { events: [target, pooled, high, approx, ...filler] };
   const wrong = { lastCorrect: false, lastWrongAt: jst('2026-10-24') };
@@ -178,18 +181,29 @@ describe('reviewCandidates', () => {
     ]);
   });
 
-  it('同じ出来事が両方のパターンで条件を満たせば、両方とも候補（母集団の順、年号入力が先）', () => {
+  it('同じ出来事が複数のパターンで条件を満たせば、それぞれ候補（母集団の順、年号入力・年号 4 択・出来事 4 択の順）', () => {
     expect(
       run([
         st('f3', 'choice', wrong),
         st('target', 'choice', wrong),
+        st('target', 'yearChoice', wrong),
         st('target', 'yearInput', wrong),
       ]),
     ).toEqual([
       ['target', 'yearInput', 3],
+      ['target', 'yearChoice', 3],
       ['target', 'choice', 3],
       ['f3', 'choice', 3],
     ]);
+  });
+
+  it('年号 4 択の記録も（出来事, パターン）の組として候補になる', () => {
+    expect(
+      run([
+        st('f1', 'yearChoice', { ...wrong, lastWrongAt: jst('2026-10-18') }),
+        st('f2', 'yearChoice'),
+      ]),
+    ).toEqual([['f1', 'yearChoice', 2]]);
   });
 
   it('現在のデータに無い eventId と、母集団に入らない高校の出来事の集計は候補にしない', () => {
@@ -201,14 +215,28 @@ describe('reviewCandidates', () => {
   });
 
   it('記録されたパターンに今は適格でなければ候補にしない', () => {
-    // approx の出来事は年号入力に適格でない（4 択には適格）
-    expect(run([st('approx', 'yearInput', wrong), st('approx', 'choice', wrong)])).toEqual([
-      ['approx', 'choice', 3],
-    ]);
-    // 誤答の候補が 3 件に満たない出来事は 4 択に適格でない（年号入力には適格）
+    // approx の出来事は年号入力と年号 4 択に適格でない（出来事 4 択には適格）
     expect(
-      run([st('lonely', 'choice', wrong), st('lonely', 'yearInput', wrong)], lonelyAll),
-    ).toEqual([['lonely', 'yearInput', 3]]);
+      run([
+        st('approx', 'yearInput', wrong),
+        st('approx', 'yearChoice', wrong),
+        st('approx', 'choice', wrong),
+      ]),
+    ).toEqual([['approx', 'choice', 3]]);
+    // 誤答の候補が 3 件に満たない出来事は出来事 4 択に適格でない（年号入力と年号 4 択には適格）
+    expect(
+      run(
+        [
+          st('lonely', 'choice', wrong),
+          st('lonely', 'yearInput', wrong),
+          st('lonely', 'yearChoice', wrong),
+        ],
+        lonelyAll,
+      ),
+    ).toEqual([
+      ['lonely', 'yearInput', 3],
+      ['lonely', 'yearChoice', 3],
+    ]);
   });
 });
 
@@ -267,20 +295,26 @@ describe('weightedSample', () => {
 
 describe('generateReviewSession', () => {
   const events = spread(30);
+  const PATTERN_CYCLE: readonly Pattern[] = ['yearInput', 'yearChoice', 'choice'];
   const candidatesOf = (count: number): ReviewCandidate[] =>
     events.slice(0, count).map((event, i) => ({
       event,
-      pattern: i % 2 === 0 ? 'yearInput' : 'choice',
+      pattern: PATTERN_CYCLE[i % 3],
       weight: (i % 3) + 1,
     }));
   const summarize = (candidates: ReviewCandidate[], seed: number, count: 10 | 20 | 'all') =>
-    generateReviewSession({ candidates, allEvents: events, count, rng: mulberry32(seed) }).map(
-      (question) => ({
-        id: question.event.id,
-        pattern: question.pattern,
-        choices: question.pattern === 'choice' ? question.choices.map((c) => c.id) : null,
-      }),
-    );
+    generateReviewSession({
+      candidates,
+      allEvents: events,
+      count,
+      currentYear: CURRENT_YEAR,
+      rng: mulberry32(seed),
+    }).map((question) => ({
+      id: question.event.id,
+      pattern: question.pattern,
+      choices: question.pattern === 'choice' ? question.choices.map((c) => c.id) : null,
+      years: question.pattern === 'yearChoice' ? question.years : null,
+    }));
 
   it('問題数（10・20・全問）だけ選び、候補が足りなければ全件を出す', () => {
     const candidates = candidatesOf(25);
@@ -302,14 +336,16 @@ describe('generateReviewSession', () => {
     expect(orders.size).toBeGreaterThan(1);
   });
 
-  it('記録されたパターンで出し、4 択は正解と除外規則を満たす誤答 3 件の選択肢を持つ', () => {
+  it('記録されたパターンで出し、出来事 4 択と年号 4 択はそれぞれの決まりを満たす選択肢を持つ', () => {
     const candidates = candidatesOf(20);
     const questions = generateReviewSession({
       candidates,
       allEvents: events,
       count: 'all',
+      currentYear: CURRENT_YEAR,
       rng: mulberry32(5),
     });
+    expect(new Set(questions.map((q) => q.pattern))).toEqual(new Set(PATTERN_CYCLE));
     for (const question of questions) {
       const candidate = candidates.find((c) => c.event === question.event);
       expect(question.pattern).toBe(candidate?.pattern);
@@ -320,27 +356,53 @@ describe('generateReviewSession', () => {
         expect(
           question.choices.filter((c) => c !== question.event).every((c) => allowed.includes(c)),
         ).toBe(true);
+      } else if (question.pattern === 'yearChoice') {
+        const { year } = question.event;
+        expect(question.years).toHaveLength(4);
+        expect(question.years).toContain(year);
+        expect(question.years).toEqual([...question.years].sort((a, b) => a - b));
+        expect(question.years.every((y) => Math.abs(y - year) <= 10)).toBe(true);
       } else {
         expect(question).not.toHaveProperty('choices');
+        expect(question).not.toHaveProperty('years');
       }
     }
   });
 
-  it('同じ出来事が両方のパターンで候補なら 2 問出る', () => {
+  it('年号 4 択の誤答から今年より後の年を除く（今年は引数で受け取る）', () => {
+    const recent = ev('recent', 2020);
+    for (const seed of SEEDS) {
+      const [question] = generateReviewSession({
+        candidates: [{ event: recent, pattern: 'yearChoice', weight: 1 }],
+        allEvents: [recent],
+        count: 10,
+        currentYear: 2021,
+        rng: mulberry32(seed),
+      });
+      expect(question.pattern === 'yearChoice' && question.years.every((y) => y <= 2021)).toBe(
+        true,
+      );
+    }
+  });
+
+  it('同じ出来事が 3 つのパターンで候補なら、パターンごとに 1 問ずつ 3 問出る', () => {
     const target = events[0];
-    const candidates: ReviewCandidate[] = [
-      { event: target, pattern: 'yearInput', weight: 3 },
-      { event: target, pattern: 'choice', weight: 3 },
-    ];
+    const candidates: ReviewCandidate[] = PATTERN_CYCLE.map((pattern) => ({
+      event: target,
+      pattern,
+      weight: 3,
+    }));
     for (const seed of SEEDS) {
       const questions = generateReviewSession({
         candidates,
         allEvents: events,
         count: 10,
+        currentYear: CURRENT_YEAR,
         rng: mulberry32(seed),
       });
       expect(questions.map((q) => [q.event.id, q.pattern]).sort()).toEqual([
         [target.id, 'choice'],
+        [target.id, 'yearChoice'],
         [target.id, 'yearInput'],
       ]);
     }
@@ -348,7 +410,13 @@ describe('generateReviewSession', () => {
 
   it('候補が 0 件なら問題は 0 問', () => {
     expect(
-      generateReviewSession({ candidates: [], allEvents: events, count: 10, rng: mulberry32(1) }),
+      generateReviewSession({
+        candidates: [],
+        allEvents: events,
+        count: 10,
+        currentYear: CURRENT_YEAR,
+        rng: mulberry32(1),
+      }),
     ).toEqual([]);
   });
 });

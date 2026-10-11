@@ -16,15 +16,18 @@ export type Era =
   | '平成'
   | '令和';
 
-/** 出題パターン。`yearInput` = 年号入力（パターン A）、`choice` = 4 択（パターン B）。 */
-export type Pattern = 'yearInput' | 'choice';
+/**
+ * 出題パターン。`yearInput` = 年号入力（パターン A）、`yearChoice` = 年号 4 択（パターン C）、
+ * `choice` = 出来事 4 択（パターン B）。`choice` は 0.1 系の記録を引き継ぐため名前を変えない（設計書 5.4 節）。
+ */
+export type Pattern = 'yearInput' | 'yearChoice' | 'choice';
 
 /** 学習段階。CSV の `level` 列が空なら `中学`。 */
 export type Level = '中学' | '高校';
 
 /**
  * 出来事の区分。`core.csv` の行は基本の年表（初期データ）、`pool.csv` の行は追加データ。
- * どちらも `level` が `中学` なら出題の母集団に入り、4 択の誤答の候補には両方を使う。
+ * どちらも `level` が `中学` なら出題の母集団に入り、出来事 4 択の誤答の候補には両方を使う。
  */
 export type Role = 'core' | 'pool';
 
@@ -53,7 +56,10 @@ export interface Deck {
   events: Event[];
 }
 
-/** セッション開始時に選ぶ出題パターン（設計書 6.1 節の 3）。`mixed` は 1 問ごとに年号入力か 4 択。 */
+/**
+ * セッション開始時に選ぶ出題パターン（設計書 6.1 節の 3）。
+ * `mixed` は 1 問ごとに、その出来事に適格なパターンから等確率で選ぶ。
+ */
 export type PatternMode = Pattern | 'mixed';
 
 /**
@@ -71,6 +77,12 @@ export type QuestionCount = 10 | 20 | 'all';
 /** 1 問。問題列と選択肢はセッション開始時に確定し、画面では変えない（設計書 6.1 節の 6）。 */
 export type Question =
   | { event: Event; pattern: 'yearInput' }
+  | {
+      event: Event;
+      pattern: 'yearChoice';
+      /** 正解（`event.year`）と誤答 3 つの 4 つの年。小さい順。 */
+      years: number[];
+    }
   | {
       event: Event;
       pattern: 'choice';

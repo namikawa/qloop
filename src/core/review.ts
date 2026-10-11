@@ -1,6 +1,6 @@
 import { calendarDaysBetween, isWithinDays, localDateKey, type DateKeyFn } from './date';
 import type { Event, EventStats, Pattern, Question, QuestionCount } from './models';
-import { generateChoices, isChoiceEligibleCached, isYearInputEligible } from './quiz';
+import { buildQuestion, isEligibleFor, PATTERNS } from './quiz';
 import type { Rng } from './random';
 
 /** 「直近 N 日以内に不正解がある」の日数（設計書 7 章の条件 1。境界を含む）。 */
@@ -8,9 +8,6 @@ export const REVIEW_RECENT_WRONG_DAYS = 14;
 
 /** 「正答率が 60% 未満」の判定に使う回答数の下限（設計書 7 章の条件 3）。 */
 const LOW_ACCURACY_MIN_ATTEMPTS = 2;
-
-/** 出題パターンの並び（候補の並びを決定的にするため、年号入力を先にする）。 */
-const PATTERNS: readonly Pattern[] = ['yearInput', 'choice'];
 
 /** 復習の候補（出来事, パターン）と、その重み。 */
 export interface ReviewCandidate {
@@ -70,7 +67,7 @@ export function reviewWeight(
 export interface ReviewCandidatesInput {
   /** 現在の母集団（`population(deck)`）。出題設定の「出題する出来事」では絞り込まない。 */
   population: readonly Event[];
-  /** 4 択の適格判定と誤答の候補に使う全出来事。 */
+  /** 出来事 4 択の適格判定と誤答の候補に使う全出来事。 */
   allEvents: readonly Event[];
   /** `eventStats` の一覧。 */
   stats: readonly EventStats[];
@@ -80,9 +77,9 @@ export interface ReviewCandidatesInput {
 }
 
 /**
- * 復習の候補を選ぶ（設計書 7 章）。現在の母集団に存在し、記録されたパターンに今も適格で
- * （年号入力は `isYearInputEligible`、4 択は誤答候補 3 件以上）、`needsReview` を満たす（出来事, パターン）の組。
- * 現在のデータに無い `eventId` の集計は候補にしない。並びは母集団の順で、同じ出来事は年号入力・4 択の順。
+ * 復習の候補を選ぶ（設計書 7 章）。現在の母集団に存在し、記録されたパターンに今も適格で（`isEligibleFor`）、
+ * `needsReview` を満たす（出来事, パターン）の組。現在のデータに無い `eventId` の集計は候補にしない。
+ * 並びは母集団の順で、同じ出来事は年号入力・年号 4 択・出来事 4 択の順。
  */
 export function reviewCandidates({
   population,
@@ -113,12 +110,6 @@ export function reviewCandidates({
     }
   }
   return result;
-}
-
-function isEligibleFor(event: Event, pattern: Pattern, allEvents: readonly Event[]): boolean {
-  return pattern === 'yearInput'
-    ? isYearInputEligible(event)
-    : isChoiceEligibleCached(event, allEvents);
 }
 
 /**
@@ -152,28 +143,28 @@ export function weightedSample<T extends { weight: number }>(
 export interface GenerateReviewSessionInput {
   /** セッション開始時に確定した候補と重み（`reviewCandidates` の結果）。 */
   candidates: readonly ReviewCandidate[];
-  /** 誤答の候補に使う全出来事。 */
+  /** 出来事 4 択の誤答の候補に使う全出来事。 */
   allEvents: readonly Event[];
   count: QuestionCount;
+  /** 今年（端末の現在の暦年）。年号 4 択の誤答から、これより後の年を除く。 */
+  currentYear: number;
   rng: Rng;
 }
 
 /**
  * 復習の問題列を作る（設計書 7 章）。候補から重み付きで重複なく問題数（足りなければ全件）を選び、
- * 選んだ順に出題する。出題パターンは記録されたパターンをそのまま使い、4 択の選択肢もここで確定する。
- * 同じ出来事が両方のパターンで候補なら、2 問出ることがある。
+ * 選んだ順に出題する。出題パターンは記録されたパターンをそのまま使い、年号 4 択と出来事 4 択の選択肢は
+ * ここで作り直して確定する。同じ出来事が複数のパターンで候補なら、パターンごとに 1 問ずつ出ることがある。
  */
 export function generateReviewSession({
   candidates,
   allEvents,
   count,
+  currentYear,
   rng,
 }: GenerateReviewSessionInput): Question[] {
   const size = count === 'all' ? candidates.length : count;
-  return weightedSample(candidates, size, rng).map(({ event, pattern }): Question => {
-    if (pattern === 'yearInput') {
-      return { event, pattern };
-    }
-    return { event, pattern, choices: generateChoices(event, allEvents, rng) };
-  });
+  return weightedSample(candidates, size, rng).map(({ event, pattern }) =>
+    buildQuestion(event, pattern, allEvents, currentYear, rng),
+  );
 }

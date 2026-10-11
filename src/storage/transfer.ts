@@ -49,8 +49,8 @@ export function parseProgressJson(text: string): ProgressExport {
   return parseProgressExport(value);
 }
 
-const PATTERNS: readonly Pattern[] = ['yearInput', 'choice'];
-const PATTERN_MODES: readonly PatternMode[] = ['yearInput', 'choice', 'mixed'];
+const PATTERNS: readonly Pattern[] = ['yearInput', 'yearChoice', 'choice'];
+const PATTERN_MODES: readonly PatternMode[] = [...PATTERNS, 'mixed'];
 const SESSION_MODES: readonly SessionMode[] = ['normal', 'review'];
 
 /**
