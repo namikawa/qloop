@@ -10,6 +10,7 @@ import type {
   Session,
   SessionMode,
 } from './models';
+import { PATTERNS } from './quiz';
 
 /**
  * 成績の集計（設計書 8 章）。入力は ProgressStore が持つ状態（`eventStats`・`sessions`・`studyDays`）と母集団。
@@ -58,7 +59,7 @@ export interface EventRow extends Tally {
   event: Event;
   /** 最後に回答した時刻（UTC の ISO 8601 文字列）。未回答は `null`。 */
   lastAnsweredAt: string | null;
-  /** パターン別の内訳（回答のあるパターンだけ。年号入力・4 択の順）。 */
+  /** パターン別の内訳（回答のあるパターンだけ。年号入力・年号 4 択・出来事 4 択の順）。 */
   patterns: PatternRow[];
 }
 
@@ -104,8 +105,6 @@ export function summarizeStats({
     history: sessionHistory(sessions),
   };
 }
-
-const PATTERNS: readonly Pattern[] = ['yearInput', 'choice'];
 
 /**
  * 出来事ごとの成績を作る。母集団の出来事だけを対象にし、並びは母集団の順（同じ id は最初の 1 件だけ）。
@@ -247,10 +246,11 @@ export function formatRange(range: Range): string {
   }
 }
 
-/** 出題パターンの表示名。 */
+/** 出題パターンの表示名（出題設定・成績の内訳・履歴で共通に使う正本）。 */
 export const PATTERN_LABELS: Readonly<Record<PatternMode, string>> = {
   yearInput: '年号入力',
-  choice: '4 択',
+  yearChoice: '年号 4 択',
+  choice: '出来事 4 択',
   mixed: 'ミックス',
 };
 

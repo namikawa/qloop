@@ -10,6 +10,7 @@ import {
   formatAccuracy,
   formatRange,
   isInterrupted,
+  PATTERN_LABELS,
   sessionHistory,
   sortEventRows,
   streakDays,
@@ -172,6 +173,33 @@ describe('summarizeStats', () => {
 });
 
 describe('eventRows', () => {
+  it('パターン別の内訳に年号 4 択も入り、年号入力・年号 4 択・出来事 4 択の順に並ぶ', () => {
+    const [row] = eventRows(
+      [ev('a', '江戸')],
+      [
+        st('a', 'choice', 3, 1, '2026-10-11T03:00:00.000Z'),
+        st('a', 'yearChoice', 2, 1, '2026-10-11T02:00:00.000Z'),
+        st('a', 'yearInput', 1, 1, '2026-10-11T01:00:00.000Z'),
+      ],
+    );
+    expect(
+      row.patterns.map(({ pattern, attempts, correct }) => [pattern, attempts, correct]),
+    ).toEqual([
+      ['yearInput', 1, 1],
+      ['yearChoice', 2, 1],
+      ['choice', 3, 1],
+    ]);
+    expect(row).toMatchObject({
+      attempts: 6,
+      correct: 3,
+      lastAnsweredAt: '2026-10-11T03:00:00.000Z',
+    });
+    // 年号 4 択だけに回答した出来事も、その内訳だけで集計する
+    const [only] = eventRows([ev('b', '江戸')], [st('b', 'yearChoice', 4, 3)]);
+    expect(only.patterns.map((pattern) => pattern.pattern)).toEqual(['yearChoice']);
+    expect(only).toMatchObject({ attempts: 4, correct: 3 });
+  });
+
   it('最終回答日はパターンのうち新しい方', () => {
     const [row] = eventRows(
       [ev('a', '江戸')],
@@ -302,8 +330,20 @@ describe('formatRange と describeSession', () => {
       }),
     ).toBe('通常 · 700年〜1600年 · ミックス');
     expect(describeSession({ mode: 'normal', range: { kind: 'all' }, pattern: 'choice' })).toBe(
-      '通常 · 全範囲 · 4 択',
+      '通常 · 全範囲 · 出来事 4 択',
+    );
+    expect(describeSession({ mode: 'normal', range: { kind: 'all' }, pattern: 'yearChoice' })).toBe(
+      '通常 · 全範囲 · 年号 4 択',
     );
     expect(describeSession({ mode: 'review', range: null, pattern: null })).toBe('復習');
+  });
+
+  it('パターンの表示名は 年号入力・年号 4 択・出来事 4 択・ミックス', () => {
+    expect(PATTERN_LABELS).toEqual({
+      yearInput: '年号入力',
+      yearChoice: '年号 4 択',
+      choice: '出来事 4 択',
+      mixed: 'ミックス',
+    });
   });
 });

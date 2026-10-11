@@ -95,6 +95,20 @@ describe('parseProgressExport', () => {
     expect(parsed.attempts[0].answeredAt).toBe('2026-10-11T01:00:01.000Z');
   });
 
+  it('回答と集計のパターン（年号入力・年号 4 択・出来事 4 択）とセッションのパターン（それとミックス）を受け付ける', () => {
+    for (const pattern of ['yearInput', 'yearChoice', 'choice']) {
+      const parsed = parseProgressExport(
+        variant((data) => {
+          firstAttempt(data).pattern = pattern;
+          firstSession(data).pattern = pattern;
+        }),
+      );
+      expect(parsed.attempts[0].pattern).toBe(pattern);
+      expect(parsed.sessions[0].pattern).toBe(pattern);
+    }
+    expect(parseProgressExport(structuredClone(VALID)).sessions[0].pattern).toBe('mixed');
+  });
+
   it('年号の範囲は端が null か 1〜4 桁の正の整数なら受け付ける', () => {
     for (const range of [
       { kind: 'all' },
@@ -203,11 +217,25 @@ describe('parseProgressExport', () => {
       /sessions の 1 件目: mode が不正です/,
     ],
     [
+      'attempts の pattern が知らない値',
+      (data) => {
+        firstAttempt(data).pattern = 'eventChoice';
+      },
+      /attempts の 1 件目: pattern が不正です（"eventChoice"）/,
+    ],
+    [
       'sessions の pattern が不明',
       (data) => {
         firstSession(data).pattern = 'choice4';
       },
       /sessions の 1 件目: pattern が不正です/,
+    ],
+    [
+      'sessions の pattern が大文字小文字の違う値',
+      (data) => {
+        firstSession(data).pattern = 'YearChoice';
+      },
+      /sessions の 1 件目: pattern が不正です（"YearChoice"）/,
     ],
     [
       'sessions の range の時代が時代区分表に無い',

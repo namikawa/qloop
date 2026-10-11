@@ -204,6 +204,26 @@ input {
   cursor: default;
 }
 
+/*
+ * 目立たせない操作（「わからない」など）。小さな下線付きの文字にして目立たせないが、
+ * 文字の色は背景とのコントラスト 4.5:1 以上を保つ。押しやすさのため高さは 44px を保つ
+ */
+.button-quiet {
+  min-height: 44px;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  color: #52606d;
+  font-size: 14px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.button-quiet:disabled {
+  color: #c4cdd5;
+  cursor: default;
+}
+
 .status-text {
   margin: 16px 0 0;
   color: #52606d;
@@ -520,6 +540,47 @@ input {
   background: #b42318;
 }
 
+/* 年号 4 択の選択肢は 2 列 2 段（小さい順に左上から）。色は .choice と同じ */
+.year-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 同じ段の 2 つの選択肢の高さをそろえる */
+.year-choices > li {
+  display: flex;
+}
+
+/*
+ * 年を中央に置き、判定後のバッジは年の下に出す（2 列の幅に収めるため）。
+ * バッジが出ても高さが変わらないよう、最初からバッジの分の高さをとる
+ */
+.year-choice {
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 72px;
+  padding: 8px;
+  text-align: center;
+}
+
+.year-choice-year {
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 「わからない」は入力欄・選択肢の下の左端に置く（「回答」のボタンから離す） */
+.give-up {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 8px;
+}
+
 .judgement {
   display: flex;
   flex-direction: column;
@@ -541,6 +602,10 @@ input {
 
 .judgement-mark.wrong {
   color: #b42318;
+}
+
+.judgement-mark.gave-up {
+  color: #52606d;
 }
 
 .judgement-detail {

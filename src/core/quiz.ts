@@ -9,8 +9,14 @@ import type {
 } from './models';
 import { randomInt, shuffle, type Rng } from './random';
 
-/** 4 択に必要な誤答の数。 */
+/** 出来事 4 択と年号 4 択に必要な誤答の数。 */
 export const CHOICE_DISTRACTOR_COUNT = 3;
+
+/** 年号 4 択の誤答の年を選ぶ範囲（正解の前後 1 年からこの年数まで。設計書 6.7 節）。 */
+export const YEAR_CHOICE_SPREAD = 10;
+
+/** 出題パターンの並び（年号入力・年号 4 択・出来事 4 択）。ミックスはこの中から選ぶ。 */
+export const PATTERNS: readonly Pattern[] = ['yearInput', 'yearChoice', 'choice'];
 
 /** `approx` の出来事が絡むとき、誤答の候補から外す年の差（この年数以内は除外）。 */
 const APPROX_EXCLUSION_YEARS = 50;
@@ -39,11 +45,36 @@ export function isYearInputEligible(event: Event): boolean {
   return !event.approx && event.year > 0;
 }
 
+/** 年号 4 択に出せるか（設計書 6.1 節の 3）: 年号入力と同じ。 */
+export function isYearChoiceEligible(event: Event): boolean {
+  return isYearInputEligible(event);
+}
+
+/**
+ * 出来事がそのパターンに適格か（設計書 6.1 節の 3）。`allEvents` は出来事 4 択の誤答の候補に使う全出来事。
+ * 出題設定の適格判定と、復習の候補選定で共通に使う。
+ */
+export function isEligibleFor(
+  event: Event,
+  pattern: Pattern,
+  allEvents: readonly Event[],
+): boolean {
+  switch (pattern) {
+    case 'yearInput':
+      return isYearInputEligible(event);
+    case 'yearChoice':
+      return isYearChoiceEligible(event);
+    case 'choice':
+      return isChoiceEligibleCached(event, allEvents);
+  }
+}
+
 /** 出題できる出来事と、その出来事に使えるパターン。 */
 export interface EligibleEvent {
   event: Event;
   /**
-   * 使えるパターン（1 件か 2 件）。2 件（ミックスで両方に適格）なら、問題を作るときに 1 問ごとに等確率で選ぶ。
+   * 使えるパターン（1〜3 件。`PATTERNS` の順）。2 件以上（ミックスで複数に適格）なら、
+   * 問題を作るときに 1 問ごとに等確率で選ぶ。
    */
   patterns: Pattern[];
 }
@@ -53,15 +84,16 @@ export interface EligibleEvent {
  * `candidates` は範囲で絞り込んだ母集団、`allEvents` は誤答の候補に使う core と pool の全出来事。
  * 並びは `candidates` の順を保ち、同じ id の出来事は最初の 1 件だけにする。
  *
- * - 年号入力: `isYearInputEligible` を満たす出来事。
- * - 4 択: 除外規則を適用した後の誤答の候補が 3 件以上ある出来事。
- * - ミックス: 両方に適格なら両方、片方だけならその形式。どちらにも適格でなければ除外する。
+ * - 年号入力・年号 4 択: `approx` でなく、`year` が正の出来事。
+ * - 出来事 4 択: 除外規則を適用した後の誤答の候補が 3 件以上ある出来事。
+ * - ミックス: 3 つのパターンのうち適格なものすべて。どれにも適格でなければ除外する。
  */
 export function eligibleQuestions(
   candidates: readonly Event[],
   allEvents: readonly Event[],
   mode: PatternMode,
 ): EligibleEvent[] {
+  const modes: readonly Pattern[] = mode === 'mixed' ? PATTERNS : [mode];
   const result: EligibleEvent[] = [];
   const seen = new Set<string>();
   for (const event of candidates) {
@@ -69,13 +101,7 @@ export function eligibleQuestions(
       continue;
     }
     seen.add(event.id);
-    const patterns: Pattern[] = [];
-    if (mode !== 'choice' && isYearInputEligible(event)) {
-      patterns.push('yearInput');
-    }
-    if (mode !== 'yearInput' && isChoiceEligibleCached(event, allEvents)) {
-      patterns.push('choice');
-    }
+    const patterns = modes.filter((pattern) => isEligibleFor(event, pattern, allEvents));
     if (patterns.length > 0) {
       result.push({ event, patterns });
     }
@@ -84,7 +110,7 @@ export function eligibleQuestions(
 }
 
 /**
- * 4 択の適格判定の結果を、全出来事の配列ごとに覚えておく。
+ * 出来事 4 択の適格判定の結果を、全出来事の配列ごとに覚えておく。
  * 適格かどうかはデータだけで決まるので（設計書 6.1 節の 3）、出題設定の画面で範囲を変えるたびに計算し直さない。
  */
 const choiceEligibilityCache = new WeakMap<readonly Event[], Map<string, boolean>>();
@@ -107,45 +133,115 @@ export function isChoiceEligibleCached(event: Event, allEvents: readonly Event[]
 export interface GenerateSessionInput {
   /** 範囲で絞り込んだ母集団。 */
   candidates: readonly Event[];
-  /** 誤答の候補に使う core と pool の全出来事。 */
+  /** 出来事 4 択の誤答の候補に使う core と pool の全出来事。 */
   allEvents: readonly Event[];
   mode: PatternMode;
   count: QuestionCount;
+  /** 今年（端末の現在の暦年）。年号 4 択の誤答から、これより後の年を除く。 */
+  currentYear: number;
   rng: Rng;
 }
 
 /**
- * 1 セッションの問題列を作る（設計書 6.1 節の 4・6、6.3 節）。
+ * 1 セッションの問題列を作る（設計書 6.1 節の 4・6、6.3 節、6.7 節）。
  * 適格な出来事から問題数（足りなければ全件）をランダムな順に選び、同じ出来事は 1 回だけ出す。
- * 4 択の選択肢もここで確定する。画面では問題列と選択肢を変えない。
+ * 年号 4 択と出来事 4 択の選択肢もここで確定する。画面では問題列と選択肢を変えない。
  */
 export function generateSession({
   candidates,
   allEvents,
   mode,
   count,
+  currentYear,
   rng,
 }: GenerateSessionInput): Question[] {
   const eligible = shuffle(eligibleQuestions(candidates, allEvents, mode), rng);
   const size = count === 'all' ? eligible.length : Math.min(count, eligible.length);
-  return eligible.slice(0, size).map(({ event, patterns }): Question => {
-    const pattern = patterns[randomInt(patterns.length, rng)];
-    if (pattern === 'yearInput') {
-      return { event, pattern };
-    }
-    return { event, pattern, choices: generateChoices(event, allEvents, rng) };
-  });
+  return eligible
+    .slice(0, size)
+    .map(({ event, patterns }) =>
+      buildQuestion(event, patterns[randomInt(patterns.length, rng)], allEvents, currentYear, rng),
+    );
 }
 
-/** 4 択の選択肢（正解と誤答 3 件）をシャッフルして返す（設計書 6.3 節）。 */
+/**
+ * 出来事とパターンから 1 問を作り、選択肢を確定する（通常の出題と復習で共通）。
+ * 出来事がそのパターンに適格であること（選択肢を作れないときは例外を投げる）。
+ */
+export function buildQuestion(
+  event: Event,
+  pattern: Pattern,
+  allEvents: readonly Event[],
+  currentYear: number,
+  rng: Rng,
+): Question {
+  switch (pattern) {
+    case 'yearInput':
+      return { event, pattern };
+    case 'yearChoice':
+      return { event, pattern, years: generateYearChoices(event, currentYear, rng) };
+    case 'choice':
+      return { event, pattern, choices: generateChoices(event, allEvents, rng) };
+  }
+}
+
+/**
+ * 年号 4 択の選択肢（正解の `year` と誤答の年 3 つ）を小さい順に並べて返す（設計書 6.7 節）。
+ *
+ * 1. 候補は `year` の前後 1〜10 年の 20 個から、0 以下の年、今年より後の年、`altYears` の年を除いたもの。
+ *    今年は `currentYear` と `year` の大きい方にする（端末の時計が出来事の年より前にずれていても選択肢を作れるように）。
+ * 2. 正解より小さい誤答の数 k（0〜3）を、正解より小さい候補が k 個以上・大きい候補が 3 − k 個以上ある k から等確率で選ぶ。
+ * 3. 小さい候補から k 個、大きい候補から 3 − k 個を重複なくランダムに選ぶ。
+ *
+ * 20 個から一様に 3 つ選ぶと、並べたときに正解が 2 番目か 3 番目に来る割合が約 8 割になり、
+ * 真ん中を選ぶだけで当たりやすくなるため、k を先に決める。
+ * 候補が 3 つに満たないときは例外を投げる（実データの全出来事で起きないことを `deck.data.test.ts` で確かめている）。
+ */
+export function generateYearChoices(
+  event: Pick<Event, 'year' | 'altYears' | 'title'>,
+  currentYear: number,
+  rng: Rng,
+): number[] {
+  const latest = Math.max(currentYear, event.year);
+  const usable = (year: number) => year > 0 && year <= latest && !event.altYears.includes(year);
+  const below: number[] = [];
+  const above: number[] = [];
+  for (let offset = 1; offset <= YEAR_CHOICE_SPREAD; offset++) {
+    if (usable(event.year - offset)) {
+      below.push(event.year - offset);
+    }
+    if (usable(event.year + offset)) {
+      above.push(event.year + offset);
+    }
+  }
+  const counts: number[] = [];
+  for (let k = 0; k <= CHOICE_DISTRACTOR_COUNT; k++) {
+    if (below.length >= k && above.length >= CHOICE_DISTRACTOR_COUNT - k) {
+      counts.push(k);
+    }
+  }
+  if (counts.length === 0) {
+    throw new Error(
+      `「${event.title}」の年号 4 択の誤答の年が ${below.length + above.length} 個しかありません`,
+    );
+  }
+  const k = counts[randomInt(counts.length, rng)];
+  const picked = [
+    ...shuffle(below, rng).slice(0, k),
+    ...shuffle(above, rng).slice(0, CHOICE_DISTRACTOR_COUNT - k),
+  ];
+  return [event.year, ...picked].sort((a, b) => a - b);
+}
+
+/** 出来事 4 択の選択肢（正解と誤答 3 件）をシャッフルして返す（設計書 6.3 節）。 */
 export function generateChoices(event: Event, allEvents: readonly Event[], rng: Rng): Event[] {
   return shuffle([event, ...pickDistractors(event, allEvents, rng)], rng);
 }
 
 /**
- * 4 択の誤答 3 件を選ぶ（設計書 6.3 節）。除外規則を適用した後の候補のうち、
+ * 出来事 4 択の誤答 3 件を選ぶ（設計書 6.3 節）。除外規則を適用した後の候補のうち、
  * 出題年の前後 100 年以内のものからランダムに選び、足りなければ同じ時代の候補、さらに全候補の順で補う
- * （選択済みのものは除く）。候補が 3 件に満たない出来事（4 択に適格でない）では例外を投げる。
+ * （選択済みのものは除く）。候補が 3 件に満たない出来事（出来事 4 択に適格でない）では例外を投げる。
  */
 export function pickDistractors(event: Event, allEvents: readonly Event[], rng: Rng): Event[] {
   const candidates = distractorCandidates(event, allEvents);
@@ -165,7 +261,7 @@ export function pickDistractors(event: Event, allEvents: readonly Event[], rng: 
       return picked;
     }
   }
-  throw new Error(`「${event.title}」の 4 択の誤答候補が ${picked.length} 件しかありません`);
+  throw new Error(`「${event.title}」の出来事 4 択の誤答候補が ${picked.length} 件しかありません`);
 }
 
 /** 年号入力の判定（設計書 6.2 節）: `year` または `altYears` のいずれかに一致すれば正解。 */
@@ -174,7 +270,7 @@ export function isCorrectYear(event: Pick<Event, 'year' | 'altYears'>, input: nu
 }
 
 /**
- * 4 択の誤答の候補（設計書 6.3 節の除外規則 1〜3 を適用した後のもの）。
+ * 出来事 4 択の誤答の候補（設計書 6.3 節の除外規則 1〜3 を適用した後のもの）。
  * `allEvents` は core と pool の全出来事。並びは `allEvents` の順を保つ。
  *
  * 1. 出題した出来事自身を除く。
@@ -199,7 +295,7 @@ export function distractorCandidates(event: Event, allEvents: readonly Event[]):
   });
 }
 
-/** 4 択に出せるか（除外規則を適用した後の誤答の候補が 3 件以上あるか）。 */
+/** 出来事 4 択に出せるか（除外規則を適用した後の誤答の候補が 3 件以上あるか）。 */
 export function isChoiceEligible(event: Event, allEvents: readonly Event[]): boolean {
   return distractorCandidates(event, allEvents).length >= CHOICE_DISTRACTOR_COUNT;
 }

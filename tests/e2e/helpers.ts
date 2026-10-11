@@ -7,6 +7,7 @@ export interface DeckEvent {
   title: string;
   era: string;
   approx: boolean;
+  altYears: number[];
   level: string;
   role: string;
 }

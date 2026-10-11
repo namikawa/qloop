@@ -8,7 +8,7 @@ interface ReviewSetupProps {
   store: ProgressStore;
   /** 出題の母集団（復習は「出題する出来事」の設定によらず母集団全体を対象にする）。 */
   population: readonly Event[];
-  /** 4 択の適格判定と誤答の候補に使う全出来事。 */
+  /** 出来事 4 択の適格判定と誤答の候補に使う全出来事。 */
   allEvents: readonly Event[];
   onStart: (session: Session, questions: Question[]) => void;
   onBack: () => void;
@@ -29,14 +29,21 @@ export function ReviewSetup({ store, population, allEvents, onStart, onBack }: R
   const [startError, setStartError] = useState<string | null>(null);
 
   const handleStart = async () => {
-    // 候補と重みはセッション開始時に確定する
+    // 候補と重み、年号 4 択と出来事 4 択の選択肢はセッション開始時に確定する
+    const now = new Date();
     const candidates = reviewCandidates({
       population,
       allEvents,
       stats: store.listEventStats(),
-      now: new Date(),
+      now,
     });
-    const questions = generateReviewSession({ candidates, allEvents, count, rng: Math.random });
+    const questions = generateReviewSession({
+      candidates,
+      allEvents,
+      count,
+      currentYear: now.getFullYear(),
+      rng: Math.random,
+    });
     if (questions.length === 0) {
       setCandidateCount(0);
       return;

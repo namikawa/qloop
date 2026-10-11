@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Attempt, Session, Settings } from '../core/models';
+import type { Attempt, Pattern, Session, Settings } from '../core/models';
 import { openDb, type QLoopDb } from './db';
 import { ProgressStore, type StartSessionInput } from './progress-store';
 import { ImportFormatError, type ProgressExport } from './transfer';
@@ -517,7 +517,7 @@ function answer(
   store: ProgressStore,
   sessionId: string,
   eventId: string,
-  pattern: 'yearInput' | 'choice',
+  pattern: Pattern,
   correct: boolean,
   endSession = false,
 ): Promise<void> {
@@ -686,6 +686,30 @@ describe('ProgressStore.exportData と importData', () => {
     expect(byKey(target.store.listEventStats())).toEqual(byKey(source.store.listEventStats()));
     expect(target.store.listSessions()).toEqual(source.store.listSessions());
     expect(target.store.getStudyDays()).toEqual(source.store.getStudyDays());
+  });
+
+  it('年号 4 択の回答は出来事 4 択と別に集計し、書き出して読み込んでも同じ集計になる', async () => {
+    const source = await createStore();
+    const session = await source.store.startSession({ ...NORMAL, pattern: 'yearChoice', total: 3 });
+    await answer(source.store, session.id, 'jh-0001', 'yearChoice', false);
+    await answer(source.store, session.id, 'jh-0001', 'choice', true);
+    await answer(source.store, session.id, 'jh-0001', 'yearChoice', true, true);
+    expect(source.store.getEventStats('jh-0001', 'yearChoice')).toMatchObject({
+      attempts: 2,
+      correct: 1,
+    });
+    expect(source.store.getEventStats('jh-0001', 'choice')).toMatchObject({
+      attempts: 1,
+      correct: 1,
+    });
+    const json = JSON.stringify(await source.store.exportData());
+
+    dbName = `${dbName}-target`;
+    const target = await createStore();
+    await target.store.importData(JSON.parse(json));
+    expect(byKey(target.store.listEventStats())).toEqual(byKey(source.store.listEventStats()));
+    expect(target.store.listSessions()).toEqual(source.store.listSessions());
+    expect(target.store.getSession(session.id)?.pattern).toBe('yearChoice');
   });
 
   it('読み込みは既存の記録と設定を消して全置換し、attempts の id は捨てて自動採番する', async () => {

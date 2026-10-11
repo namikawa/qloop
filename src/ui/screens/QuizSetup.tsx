@@ -13,6 +13,7 @@ import type {
 } from '../../core/models';
 import { eligibleQuestions, filterByScope, generateSession } from '../../core/quiz';
 import { filterByRange, parseRangeYear, validateRange } from '../../core/range';
+import { PATTERN_LABELS } from '../../core/stats';
 import type { ProgressStore } from '../../storage/progress-store';
 
 /**
@@ -30,11 +31,10 @@ const SCOPE_OPTIONS: { value: EventScope; label: string }[] = [
   { value: 'all', label: 'すべて' },
 ];
 
-const PATTERN_OPTIONS: { value: PatternMode; label: string }[] = [
-  { value: 'yearInput', label: '年号入力' },
-  { value: 'choice', label: '4 択' },
-  { value: 'mixed', label: 'ミックス' },
-];
+/** 出題パターンの選択肢（年号入力・年号 4 択・出来事 4 択・ミックスの順。表示名は `PATTERN_LABELS`）。 */
+const PATTERN_OPTIONS: { value: PatternMode; label: string }[] = (
+  ['yearInput', 'yearChoice', 'choice', 'mixed'] as const
+).map((value) => ({ value, label: PATTERN_LABELS[value] }));
 
 /** 問題数の選択肢（出題設定と復習で共通）。 */
 export const COUNT_OPTIONS: { value: QuestionCount; label: string }[] = [
@@ -132,6 +132,7 @@ export function QuizSetup({ store, population, allEvents, onStart, onBack }: Qui
       allEvents,
       mode: pattern,
       count,
+      currentYear: new Date().getFullYear(),
       rng: Math.random,
     });
     setStarting(true);
@@ -180,7 +181,7 @@ export function QuizSetup({ store, population, allEvents, onStart, onBack }: Qui
 
         <fieldset className="field">
           <legend className="field-legend">出題パターン</legend>
-          <div className="options options-3">
+          <div className="options options-2">
             {PATTERN_OPTIONS.map((option) => (
               <label key={option.value} className="option">
                 <input

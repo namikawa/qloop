@@ -98,7 +98,7 @@ export function buildDeck(input: DeckInput): BuildDeckResult {
         at,
         column: 'year',
         message:
-          `4 択の誤答候補が ${count} 件しかありません` +
+          `出来事 4 択の誤答候補が ${count} 件しかありません` +
           `（除外規則の適用後に ${CHOICE_DISTRACTOR_COUNT} 件以上必要です）`,
       });
     }

@@ -236,7 +236,7 @@ describe('buildDeck', () => {
       ],
     );
     expect(errorsOf(result)).toEqual([
-      'core.csv 2 行目 year: 4 択の誤答候補が 2 件しかありません（除外規則の適用後に 3 件以上必要です）',
+      'core.csv 2 行目 year: 出来事 4 択の誤答候補が 2 件しかありません（除外規則の適用後に 3 件以上必要です）',
     ]);
   });
 
