@@ -1,8 +1,25 @@
 /// <reference types="vitest/config" />
+import { readFileSync } from 'node:fs';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import pkg from './package.json' with { type: 'json' };
+
+/** 配信時の応答ヘッダー（設計書 9.2 節）。全パスへの指定 1 つだけを受け付ける。 */
+function readPreviewHeaders(): Record<string, string> {
+  const [path, ...lines] = readFileSync(new URL('./public/_headers', import.meta.url), 'utf8')
+    .replace(/\r?\n$/, '')
+    .split(/\r?\n/);
+  if (path !== '/*') throw new Error('_headers の先頭は /* にしてください');
+  return Object.fromEntries(
+    lines.map((line) => {
+      if (!/^[ \t]+[A-Za-z0-9-]+: \S.*$/.test(line))
+        throw new Error(`_headers の行が不正です: ${line}`);
+      const separator = line.indexOf(': ');
+      return [line.slice(0, separator).trim(), line.slice(separator + 2)];
+    }),
+  );
+}
 
 export default defineConfig({
   define: {
@@ -10,6 +27,10 @@ export default defineConfig({
   },
   build: {
     target: 'safari15',
+  },
+  // 開発サーバーは React Refresh のインラインスクリプトが CSP で止まるため、preview にだけ付ける。
+  preview: {
+    headers: readPreviewHeaders(),
   },
   plugins: [
     react(),

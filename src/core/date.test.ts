@@ -8,7 +8,6 @@ import {
   formatLocalDateTime,
   isWithinDays,
   localDateKey,
-  startOfLocalDay,
   type DateKeyFn,
 } from './date';
 
@@ -27,15 +26,6 @@ describe('localDateKey', () => {
   it('端末ローカルの暦日を YYYY-MM-DD にする', () => {
     expect(localDateKey(new Date(2026, 0, 2, 23, 59, 59))).toBe('2026-01-02');
     expect(localDateKey(new Date(2026, 11, 31, 0, 0, 0))).toBe('2026-12-31');
-  });
-});
-
-describe('startOfLocalDay', () => {
-  it('端末ローカルの暦日の 0 時を返す', () => {
-    expect(startOfLocalDay(new Date(2026, 9, 11, 23, 59, 59, 999))).toEqual(
-      new Date(2026, 9, 11, 0, 0, 0, 0),
-    );
-    expect(startOfLocalDay(new Date(2026, 9, 11))).toEqual(new Date(2026, 9, 11));
   });
 });
 
@@ -108,10 +98,9 @@ describe('isWithinDays', () => {
     expect(isWithinDays(new Date('2026-10-24T14:59:00.000Z'), now, 0, JST)).toBe(false);
   });
 
-  it('端末ローカルの暦では「startOfLocalDay(now) から N 日戻した 0 時以降」と同じ結果になる', () => {
+  it('端末ローカルの暦では N 日前の 0 時以降かを判定する', () => {
     const localNow = new Date(2026, 9, 25, 9, 30);
-    const start = startOfLocalDay(localNow);
-    const threshold = new Date(start.getFullYear(), start.getMonth(), start.getDate() - 14);
+    const threshold = new Date(2026, 9, 11);
     for (const time of [
       new Date(2026, 9, 10, 23, 59, 59, 999),
       new Date(2026, 9, 11, 0, 0, 0, 0),

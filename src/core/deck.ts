@@ -28,7 +28,7 @@ export interface DeckInput {
 
 export type BuildDeckResult = { ok: true; deck: Deck } | { ok: false; errors: string[] };
 
-const ID_PREFIXES = ['jh-', 'demo-'];
+const ID_PREFIX = 'jh-';
 /** 0 以外の整数（先頭の 0 と + は不可）。 */
 const NONZERO_INTEGER = /^-?[1-9][0-9]*$/;
 
@@ -154,8 +154,8 @@ function rowToEvent(
   const id = cell('id');
   if (id === '') {
     fail('id', '必須です');
-  } else if (!ID_PREFIXES.some((prefix) => id.startsWith(prefix) && id.length > prefix.length)) {
-    fail('id', `「${id}」は ${ID_PREFIXES.join(' または ')} で始めてください`);
+  } else if (!id.startsWith(ID_PREFIX) || id.length <= ID_PREFIX.length) {
+    fail('id', `「${id}」は ${ID_PREFIX} で始めてください`);
   }
 
   const yearText = cell('year');

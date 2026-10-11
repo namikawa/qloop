@@ -9,7 +9,8 @@ import { shouldShowInstallBanner } from '../pwa/standalone';
 import { useAppUpdate } from '../pwa/update';
 import { openDb, requestPersistentStorage } from '../storage/db';
 import { ProgressStore } from '../storage/progress-store';
-import { Home } from './screens/Home';
+import { describeError } from './errors';
+import { Home, type StoreStatus } from './screens/Home';
 import { Quiz, type QuizResult } from './screens/Quiz';
 import { QuizSetup } from './screens/QuizSetup';
 import { Result } from './screens/Result';
@@ -32,9 +33,8 @@ type View =
 
 /** 学習の記録（IndexedDB）の準備の状態。 */
 type StoreState =
-  | { status: 'loading' }
-  | { status: 'ready'; store: ProgressStore }
-  | { status: 'error'; message: string };
+  | Exclude<StoreStatus, { status: 'ready' }>
+  | (Extract<StoreStatus, { status: 'ready' }> & { store: ProgressStore });
 
 let storePromise: Promise<ProgressStore> | null = null;
 
@@ -48,13 +48,6 @@ function loadStore(): Promise<ProgressStore> {
     return store;
   })();
   return storePromise;
-}
-
-function describeError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message !== '' ? error.message : error.name;
-  }
-  return String(error);
 }
 
 export function App() {

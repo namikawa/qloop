@@ -1,13 +1,14 @@
 import { compactLocalDate } from '../core/date';
 import { isEra } from '../core/era';
-import type {
-  Attempt,
-  Era,
-  Pattern,
-  PatternMode,
-  Range,
-  Session,
-  SessionMode,
+import {
+  PATTERNS,
+  type Attempt,
+  type Era,
+  type Pattern,
+  type PatternMode,
+  type Range,
+  type Session,
+  type SessionMode,
 } from '../core/models';
 
 /**
@@ -49,9 +50,9 @@ export function parseProgressJson(text: string): ProgressExport {
   return parseProgressExport(value);
 }
 
-const PATTERNS: readonly Pattern[] = ['yearInput', 'yearChoice', 'choice'];
 const PATTERN_MODES: readonly PatternMode[] = [...PATTERNS, 'mixed'];
-const SESSION_MODES: readonly SessionMode[] = ['normal', 'review'];
+const SESSION_MODE_KEYS: Record<SessionMode, true> = { normal: true, review: true };
+const SESSION_MODES: readonly SessionMode[] = Object.keys(SESSION_MODE_KEYS) as SessionMode[];
 
 /**
  * 読み込んだ値の形式を検証し、知らない項目を除いた新しいオブジェクトにして返す（設計書 5.6 節）。

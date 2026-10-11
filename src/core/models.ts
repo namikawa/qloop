@@ -22,6 +22,16 @@ export type Era =
  */
 export type Pattern = 'yearInput' | 'yearChoice' | 'choice';
 
+/** 型にパターンを足すとき、一覧への追加も型検査で必須にする。 */
+const PATTERN_KEYS: Record<Pattern, true> = {
+  yearInput: true,
+  yearChoice: true,
+  choice: true,
+};
+
+/** 出題パターンの並び（年号入力・年号 4 択・出来事 4 択）。ミックスはこの中から選ぶ。 */
+export const PATTERNS: readonly Pattern[] = Object.keys(PATTERN_KEYS) as Pattern[];
+
 /** 学習段階。CSV の `level` 列が空なら `中学`。 */
 export type Level = '中学' | '高校';
 

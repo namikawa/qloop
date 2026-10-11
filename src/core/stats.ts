@@ -1,16 +1,16 @@
 import { addDaysToKey, localDateKey, type DateKeyFn } from './date';
 import { ERAS } from './era';
-import type {
-  Era,
-  Event,
-  EventStats,
-  Pattern,
-  PatternMode,
-  Range,
-  Session,
-  SessionMode,
+import {
+  PATTERNS,
+  type Era,
+  type Event,
+  type EventStats,
+  type Pattern,
+  type PatternMode,
+  type Range,
+  type Session,
+  type SessionMode,
 } from './models';
-import { PATTERNS } from './quiz';
 
 /**
  * 成績の集計（設計書 8 章）。入力は ProgressStore が持つ状態（`eventStats`・`sessions`・`studyDays`）と母集団。
@@ -38,7 +38,7 @@ export function formatAccuracy(tally: Tally): string {
 }
 
 /** 全体の成績。 */
-export interface OverallStats extends Tally {
+interface OverallStats extends Tally {
   /** 連続学習日数。 */
   streakDays: number;
 }
@@ -49,7 +49,7 @@ export interface EraStats extends Tally {
 }
 
 /** 出来事 × パターンの成績（出来事別の内訳）。 */
-export interface PatternRow extends Tally {
+interface PatternRow extends Tally {
   pattern: Pattern;
   lastAnsweredAt: string;
 }
@@ -255,7 +255,7 @@ export const PATTERN_LABELS: Readonly<Record<PatternMode, string>> = {
 };
 
 /** セッションの種類の表示名。 */
-export const SESSION_MODE_LABELS: Readonly<Record<SessionMode, string>> = {
+const SESSION_MODE_LABELS: Readonly<Record<SessionMode, string>> = {
   normal: '通常',
   review: '復習',
 };

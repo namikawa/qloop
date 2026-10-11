@@ -34,9 +34,9 @@ function row(
 
 /** どの core 行にも誤答候補が 3 件以上そろうよう、年の離れた出来事を pool に置く。 */
 const FILLER = [
-  row('demo-0901', '100', '誤答用の出来事 1'),
-  row('demo-0902', '900', '誤答用の出来事 2'),
-  row('demo-0903', '1700', '誤答用の出来事 3'),
+  row('jh-0901', '100', '誤答用の出来事 1'),
+  row('jh-0902', '900', '誤答用の出来事 2'),
+  row('jh-0903', '1700', '誤答用の出来事 3'),
 ];
 
 function build(core: string[][], pool: string[][] = FILLER) {
@@ -118,7 +118,7 @@ describe('buildDeck', () => {
 
   it('alt_years は ; 区切りで複数書け、セルの前後の空白は無視する', () => {
     const result = build([
-      row('demo-0001', ' 1185 ', ' 鎌倉幕府の成立 ', { altYears: '1183; 1192' }),
+      row('jh-0001', ' 1185 ', ' 鎌倉幕府の成立 ', { altYears: '1183; 1192' }),
     ]);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -131,38 +131,43 @@ describe('buildDeck', () => {
 
   it('id の重複をファイルをまたいで検出する', () => {
     const result = build(
-      [row('demo-0001', '710', '平城京に都を移す')],
-      [...FILLER, row('demo-0001', '794', '平安京に都を移す')],
+      [row('jh-0001', '710', '平城京に都を移す')],
+      [...FILLER, row('jh-0001', '794', '平安京に都を移す')],
     );
     expect(errorsOf(result)).toEqual([
-      'pool.csv 5 行目 id: 「demo-0001」は core.csv 2 行目と重複しています',
+      'pool.csv 5 行目 id: 「jh-0001」は core.csv 2 行目と重複しています',
     ]);
   });
 
   it('title の重複をファイルをまたいで検出する', () => {
     const result = build(
-      [row('demo-0001', '710', '平城京に都を移す')],
-      [...FILLER, row('demo-0002', '711', '平城京に都を移す')],
+      [row('jh-0001', '710', '平城京に都を移す')],
+      [...FILLER, row('jh-0002', '711', '平城京に都を移す')],
     );
     expect(errorsOf(result)).toEqual([
       'pool.csv 5 行目 title: 「平城京に都を移す」は core.csv 2 行目と重複しています',
     ]);
   });
 
-  it('id は jh- か demo- で始まり、必須', () => {
+  it('id は jh- で始まり、必須', () => {
     const result = build([row('ab-0001', '710', '出来事 A'), row('', '794', '出来事 B')]);
     expect(errorsOf(result)).toEqual([
-      expect.stringMatching(/^core\.csv 2 行目 id: 「ab-0001」は jh- または demo- で始めて/),
+      expect.stringMatching(/^core\.csv 2 行目 id: 「ab-0001」は jh- で始めて/),
       'core.csv 3 行目 id: 必須です',
     ]);
   });
 
+  it('仮データの demo- で始まる id は受け付けない', () => {
+    const result = build([row('demo-0001', '710', '出来事 A')]);
+    expect(errorsOf(result)).toEqual(['core.csv 2 行目 id: 「demo-0001」は jh- で始めてください']);
+  });
+
   it('year は 0 以外の整数', () => {
     const result = build([
-      row('demo-0001', '0', '出来事 A'),
-      row('demo-0002', '71.5', '出来事 B'),
-      row('demo-0003', '0710', '出来事 C'),
-      row('demo-0004', '', '出来事 D'),
+      row('jh-0001', '0', '出来事 A'),
+      row('jh-0002', '71.5', '出来事 B'),
+      row('jh-0003', '0710', '出来事 C'),
+      row('jh-0004', '', '出来事 D'),
     ]);
     expect(errorsOf(result)).toEqual([
       expect.stringMatching(/^core\.csv 2 行目 year: 「0」は 0 以外の整数/),
@@ -173,12 +178,12 @@ describe('buildDeck', () => {
   });
 
   it('title は必須', () => {
-    const result = build([row('demo-0001', '710', '')]);
+    const result = build([row('jh-0001', '710', '')]);
     expect(errorsOf(result)).toEqual(['core.csv 2 行目 title: 必須です']);
   });
 
   it('era は時代区分表にある名前に限る', () => {
-    const result = build([row('demo-0001', '1185', '出来事 A', { era: '鎌倉時代' })]);
+    const result = build([row('jh-0001', '1185', '出来事 A', { era: '鎌倉時代' })]);
     expect(errorsOf(result)).toEqual([
       expect.stringMatching(/^core\.csv 2 行目 era: 「鎌倉時代」は時代区分表にありません/),
     ]);
@@ -186,9 +191,9 @@ describe('buildDeck', () => {
 
   it('alt_years は year と異なる整数', () => {
     const result = build([
-      row('demo-0001', '1185', '出来事 A', { altYears: '1185' }),
-      row('demo-0002', '1185', '出来事 B', { altYears: '1192;x' }),
-      row('demo-0003', '1185', '出来事 C', { altYears: '1192;' }),
+      row('jh-0001', '1185', '出来事 A', { altYears: '1185' }),
+      row('jh-0002', '1185', '出来事 B', { altYears: '1192;x' }),
+      row('jh-0003', '1185', '出来事 C', { altYears: '1192;' }),
     ]);
     expect(errorsOf(result)).toEqual([
       'core.csv 2 行目 alt_years: 「1185」は year と同じです',
@@ -199,9 +204,9 @@ describe('buildDeck', () => {
 
   it('approx は 1 か空', () => {
     const result = build([
-      row('demo-0001', '710', '出来事 A', { approx: '1' }),
-      row('demo-0002', '794', '出来事 B', { approx: '2' }),
-      row('demo-0003', '894', '出来事 C', { approx: 'true' }),
+      row('jh-0001', '710', '出来事 A', { approx: '1' }),
+      row('jh-0002', '794', '出来事 B', { approx: '2' }),
+      row('jh-0003', '894', '出来事 C', { approx: 'true' }),
     ]);
     expect(errorsOf(result)).toEqual([
       'core.csv 3 行目 approx: 「2」は 1 か空にしてください',
@@ -211,9 +216,9 @@ describe('buildDeck', () => {
 
   it('level は 中学・高校・空のいずれか', () => {
     const result = build([
-      row('demo-0001', '710', '出来事 A', { level: '中学' }),
-      row('demo-0002', '794', '出来事 B', { level: '高校' }),
-      row('demo-0003', '894', '出来事 C', { level: '大学' }),
+      row('jh-0001', '710', '出来事 A', { level: '中学' }),
+      row('jh-0002', '794', '出来事 B', { level: '高校' }),
+      row('jh-0003', '894', '出来事 C', { level: '大学' }),
     ]);
     expect(errorsOf(result)).toEqual([
       'core.csv 4 行目 level: 「大学」は 中学・高校・空のいずれかにしてください',
@@ -223,16 +228,16 @@ describe('buildDeck', () => {
   it('core の行で除外規則の適用後の誤答候補が 3 件未満ならエラーにする', () => {
     const result = build(
       [
-        row('demo-0001', '250', '古墳がつくられはじめる', {
+        row('jh-0001', '250', '古墳がつくられはじめる', {
           approx: '1',
           yearLabel: '3世紀中ごろ',
         }),
       ],
       [
-        row('demo-0101', '239', '卑弥呼が魏に使いを送る'),
-        row('demo-0102', '250', '同じ年の出来事'),
-        row('demo-0103', '538', '仏教が伝わる'),
-        row('demo-0104', '57', '金印を授かる'),
+        row('jh-0101', '239', '卑弥呼が魏に使いを送る'),
+        row('jh-0102', '250', '同じ年の出来事'),
+        row('jh-0103', '538', '仏教が伝わる'),
+        row('jh-0104', '57', '金印を授かる'),
       ],
     );
     expect(errorsOf(result)).toEqual([
@@ -241,7 +246,7 @@ describe('buildDeck', () => {
   });
 
   it('pool の行は誤答候補が少なくてもエラーにしない', () => {
-    const result = build([], [row('demo-0101', '239', '卑弥呼が魏に使いを送る')]);
+    const result = build([], [row('jh-0101', '239', '卑弥呼が魏に使いを送る')]);
     expect(result.ok).toBe(true);
   });
 
@@ -249,8 +254,8 @@ describe('buildDeck', () => {
     const result = buildDeck({
       id: 'test',
       name: 'テスト',
-      core: 'demo-0001,710,出来事 A,,,,,\n',
-      pool: csv(...FILLER) + 'demo-0904,1800\n',
+      core: 'jh-0001,710,出来事 A,,,,,\n',
+      pool: csv(...FILLER) + 'jh-0904,1800\n',
     });
     expect(errorsOf(result)).toEqual([
       expect.stringMatching(/^core\.csv 1 行目: ヘッダー行が/),
@@ -262,8 +267,8 @@ describe('buildDeck', () => {
     const result = buildDeck({
       id: 'test',
       name: 'テスト',
-      core: csv(row('demo-0001', '0', '出来事 A')) + 'demo-0002,"x\n' + 'demo-0003,1,2\n',
-      pool: csv(row('demo-0101', 'x', '出来事 B')),
+      core: csv(row('jh-0001', '0', '出来事 A')) + 'jh-0002,"x\n' + 'jh-0003,1,2\n',
+      pool: csv(row('jh-0101', 'x', '出来事 B')),
     });
     expect(errorsOf(result).map((error) => error.split(/[ :]/).slice(0, 2).join(' '))).toEqual([
       'core.csv 2',
@@ -276,8 +281,8 @@ describe('buildDeck', () => {
   it('エラーは全件をまとめて返す', () => {
     const result = build([
       row('xx-0001', '0', '', { era: '戦国', approx: 'y', altYears: 'a', level: '小学' }),
-      row('demo-0002', '710', '出来事 B'),
-      row('demo-0002', '710', '出来事 B'),
+      row('jh-0002', '710', '出来事 B'),
+      row('jh-0002', '710', '出来事 B'),
     ]);
     expect(errorsOf(result).map((error) => error.split(':')[0])).toEqual([
       'core.csv 2 行目 id',

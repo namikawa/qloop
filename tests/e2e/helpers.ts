@@ -40,6 +40,17 @@ export function radio(page: Page, name: string) {
   return page.getByRole('radio', { name, exact: true });
 }
 
+/** 画面を開く前に呼び、コンソールのエラーから CSP 違反を集める（設計書 9.2 節）。 */
+export function collectCspViolations(page: Page): string[] {
+  const violations: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error' && /Content Security Policy|Refused to/.test(message.text())) {
+      violations.push(message.text());
+    }
+  });
+  return violations;
+}
+
 /** ホームを開き、学習の記録を読み込み終えてから出題設定へ進む。 */
 export async function openSetup(page: Page): Promise<void> {
   await page.goto('/');

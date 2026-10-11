@@ -41,13 +41,14 @@ QLoop の配信と、端末での使い方をまとめる。設計上の決定�
 ### 2.1 配信後の確認
 
 - ブラウザで公開 URL を開き、ホーム画面の下部の版が上げた版になっていることを確かめる。
-- 必要なら主要なファイルを確かめる。どれも 200 が返り、`index.html` に noindex が入っていればよい。
+- 必要なら主要なファイルを確かめる。どれも 200 が返り、`index.html` に noindex が入り、CSP の応答ヘッダーが返ることを確かめる。
 
   ```
   curl -sI https://qloop.na3.workers.dev/ | head -1
   curl -sI https://qloop.na3.workers.dev/sw.js | head -1
   curl -sI https://qloop.na3.workers.dev/manifest.webmanifest | head -1
   curl -s https://qloop.na3.workers.dev/ | grep noindex
+  curl -sI https://qloop.na3.workers.dev/ | grep -i content-security-policy
   ```
 
 - `/index.html` は `/` への転送（307）になる。Service Worker は転送の印を外した形で事前キャッシュするので、オフライン起動には影響しない（2026-10-11 に本番の URL で WebKit を使って確認）。

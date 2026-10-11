@@ -21,9 +21,9 @@ import { ScreenHeader } from '../components/ScreenHeader';
 import { Segmented } from '../components/Segmented';
 
 /**
- * 保存した設定が無いときの初期値（設計書 6.1 節）。出題する出来事は塾が推奨する基本の年表のみ、問題数は 10。
+ * 保存した設定が無いときの初期値（設計書 6.1 節）。出題する出来事は基本の年表のみ、問題数は 10。
  */
-export const DEFAULT_SETTINGS: Settings = {
+const DEFAULT_SETTINGS: Settings = {
   scope: 'core',
   pattern: 'yearInput',
   count: 10,

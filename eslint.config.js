@@ -12,6 +12,7 @@ export default defineConfig([
     'playwright-report',
     'test-results',
     '.wrangler',
+    '.briefs',
   ]),
   js.configs.recommended,
   {

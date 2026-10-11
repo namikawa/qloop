@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { devices, expect, test } from '@playwright/test';
+import { collectCspViolations } from './helpers';
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8')) as T;
@@ -8,6 +9,7 @@ function readJson<T>(path: string): T {
 const INSTALL_MESSAGE = 'Safari の共有メニューから『ホーム画面に追加』して使ってください';
 
 test('ホーム画面に教材名・件数・版が表示され、横スクロールしない', async ({ page }) => {
+  const cspViolations = collectCspViolations(page);
   // deck.json は webServer のビルドで生成されるので、テストの中で読む
   const { version } = readJson<{ version: string }>('../../package.json');
   const deck = readJson<{ events: { role: string; level: string }[] }>(
@@ -41,6 +43,7 @@ test('ホーム画面に教材名・件数・版が表示され、横スクロ�
     client: document.documentElement.clientWidth,
   }));
   expect(widths.scroll).toBeLessThanOrEqual(widths.client);
+  expect(cspViolations).toEqual([]);
 });
 
 test.describe('iPhone の Safari のタブで開いたとき', () => {

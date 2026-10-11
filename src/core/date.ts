@@ -21,11 +21,6 @@ export function localDateKey(date: Date): string {
   return `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1, 2)}-${pad(date.getDate(), 2)}`;
 }
 
-/** 端末ローカルの暦日の 0 時。 */
-export function startOfLocalDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
 /** 暦日 `YYYY-MM-DD` の通し番号（1970-01-01 を 0 とする日数）。形式が違えば例外を投げる。 */
 function dayNumber(key: string): number {
   const match = DATE_KEY.exec(key);

@@ -367,7 +367,7 @@ function normalizeSettings(stored: StoredSettings): Settings {
 }
 
 /** `attempts` から再計算した派生データ。 */
-export interface DerivedProgress {
+interface DerivedProgress {
   stats: EventStats[];
   sessions: Session[];
   studyDays: string[];
@@ -378,7 +378,7 @@ export interface DerivedProgress {
  * 集計の規則は `recordAnswer` と同じ（後に記録した回答を「最後の回答」とする）。
  * `sessions` は `answered`・`correct` だけを数え直し、他の項目はそのまま。回答の無いセッションは 0 件になる。
  */
-export function deriveProgress(
+function deriveProgress(
   attempts: readonly Attempt[],
   sessions: readonly Session[],
   dateKey: (date: Date) => string,
