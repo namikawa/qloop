@@ -120,6 +120,30 @@ button {
   text-align: center;
 }
 
+/* 版の表示と「アプリを更新」を横に並べる（狭い画面では折り返す） */
+.footer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  column-gap: 16px;
+}
+
+.update-button {
+  font-size: 14px;
+}
+
+/* 「アプリを更新」の結果。空のときは高さを取らない */
+.update-status {
+  margin: 0;
+  color: #52606d;
+  font-size: 14px;
+}
+
+.update-status-error {
+  color: #b42318;
+}
+
 /* ---- 共通のボタンと文字 ---- */
 
 input {
