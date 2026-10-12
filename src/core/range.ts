@@ -26,6 +26,21 @@ export function filterByRange(events: readonly Event[], range: Range): Event[] {
   }
 }
 
+/** 出題範囲の表示（例: `全範囲`、`700年〜1600年`、`700年〜`、`〜1600年`、`奈良・江戸`）。履歴で使う。 */
+export function formatRange(range: Range): string {
+  switch (range.kind) {
+    case 'all':
+      return '全範囲';
+    case 'years':
+      if (range.from === null && range.to === null) {
+        return '全範囲';
+      }
+      return `${range.from === null ? '' : `${range.from}年`}〜${range.to === null ? '' : `${range.to}年`}`;
+    case 'eras':
+      return range.eras.join('・');
+  }
+}
+
 /**
  * 出題範囲を開始できない理由（設計書 6.1 節の 2）。開始できるなら `null`。
  * 開始年が終了年より大きいとき、時代を 1 つも選んでいないときに理由を返す。

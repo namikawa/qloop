@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import type { KindLabels } from '../../core/decks';
 import type { UpdateCheckCallbacks, UpdateCheckResult } from '../../pwa/update-check';
 import { Banner, BannerCloseButton } from '../components/Banner';
 import {
@@ -8,16 +9,26 @@ import {
   StatsIcon,
   UpdateIcon,
 } from '../components/icons';
+import { Segmented } from '../components/Segmented';
 
 /** 学習の記録（IndexedDB）の準備の状態。 */
 export type StoreStatus =
   { status: 'loading' } | { status: 'ready' } | { status: 'error'; message: string };
 
 interface HomeProps {
+  /** 切り替えボタンに出す教材の一覧。教材が 1 つのときは `null`（切り替えを出さない。設計書 6.9 節）。 */
+  decks: readonly { id: string; name: string }[] | null;
+  /** 選んだ教材の id。 */
+  deckId: string;
+  /** 切り替えボタンで教材を選んだとき。 */
+  onSelectDeck: (deckId: string) => void;
+  /** 選んだ教材の名前。 */
   deckName: string;
-  /** 出題できる出来事（母集団）の件数。 */
+  /** 選んだ教材の種類の画面の言葉（「出来事」「基本の年表」など）。 */
+  labels: KindLabels;
+  /** 出題できる項目（母集団）の件数。 */
   targetCount: number;
-  /** 母集団のうち、基本の年表（core.csv）の件数。 */
+  /** 母集団のうち、基本データ（core.csv）の件数。 */
   coreCount: number;
   version: string;
   storeStatus: StoreStatus;
@@ -111,7 +122,11 @@ function VersionFooter({
 }
 
 export function Home({
+  decks,
+  deckId,
+  onSelectDeck,
   deckName,
+  labels,
   targetCount,
   coreCount,
   version,
@@ -157,13 +172,31 @@ export function Home({
           <img src="/qloop-logo.svg" alt="QLoop" width={112} height={36} />
         </h1>
         <section className="card deck" aria-labelledby="deck-name">
+          {decks !== null && (
+            <div className="deck-switch">
+              <Segmented
+                legend="教材"
+                legendHidden
+                name="deck"
+                options={decks.map((deck) => ({ value: deck.id, label: deck.name }))}
+                value={deckId}
+                onChange={onSelectDeck}
+                // 読み込み中は lastDeck に保存できないので、他のボタンと同じく押せなくする
+                disabled={!ready}
+              />
+            </div>
+          )}
           <h2 id="deck-name" className="deck-name">
             {deckName}
           </h2>
           <p className="deck-count-text" data-testid="target-count">
             {/* 狭い画面では括弧の前で折り返す */}
-            <span className="nowrap">出題できる出来事 {targetCount} 件</span>
-            <span className="nowrap">（基本の年表 {coreCount} 件）</span>
+            <span className="nowrap">
+              出題できる{labels.item} {targetCount} 件
+            </span>
+            <span className="nowrap">
+              （{labels.core} {coreCount} 件）
+            </span>
           </p>
           {ready && streakDays !== null && (
             <p className="streak" data-testid="home-streak">

@@ -1,6 +1,6 @@
 import { parseCsv } from './csv';
 import { ERAS, isEra, resolveEra } from './era';
-import type { Deck, Era, Event, Level, Role } from './models';
+import type { Era, Event, Level, Role, TimelineDeck } from './models';
 import { CHOICE_DISTRACTOR_COUNT, distractorCandidates } from './quiz';
 
 /** CSV の列（設計書 5.1 節）。順序も固定。 */
@@ -20,15 +20,16 @@ type Column = (typeof CSV_COLUMNS)[number];
 export interface DeckInput {
   id: string;
   name: string;
+  /** 項目の id の接頭辞（教材の定義に持つ。年表は `jh-`。設計書 5.5 節）。 */
+  idPrefix: string;
   /** core.csv の内容（基本の年表）。 */
   core: string;
   /** pool.csv の内容（追加データ）。 */
   pool: string;
 }
 
-export type BuildDeckResult = { ok: true; deck: Deck } | { ok: false; errors: string[] };
+export type BuildDeckResult = { ok: true; deck: TimelineDeck } | { ok: false; errors: string[] };
 
-const ID_PREFIX = 'jh-';
 /** 0 以外の整数（先頭の 0 と + は不可）。 */
 const NONZERO_INTEGER = /^-?[1-9][0-9]*$/;
 
@@ -48,8 +49,8 @@ interface DeckError {
 }
 
 /**
- * core.csv と pool.csv から問題集を作り、設計書 5.2 節の検証を行う。
- * エラーは「ファイル名 行番号 列名: 内容」の形で、全件をファイル順・行番号順に並べて返す。
+ * core.csv と pool.csv から年表の教材を作り、設計書 5.2 節の検証を行う。
+ * エラーは「ファイル名 行番号 列名: 内容」の形で、全件をファイル順・行番号順に並べて返す（教材名は呼び出し側で付ける）。
  */
 export function buildDeck(input: DeckInput): BuildDeckResult {
   const sources: { file: string; role: Role; text: string }[] = [
@@ -75,7 +76,7 @@ export function buildDeck(input: DeckInput): BuildDeckResult {
     for (const row of parsed.rows) {
       const at = locate(row.line);
       const cells = row.cells.map((cell) => cell.trim());
-      const result = rowToEvent(cells, source.role);
+      const result = rowToEvent(cells, source.role, input.idPrefix);
       for (const fieldError of result.errors) {
         errors.push({ at, ...fieldError });
       }
@@ -114,7 +115,7 @@ export function buildDeck(input: DeckInput): BuildDeckResult {
       ),
     };
   }
-  return { ok: true, deck: { id: input.id, name: input.name, events } };
+  return { ok: true, deck: { id: input.id, kind: 'timeline', name: input.name, items: events } };
 }
 
 function checkUnique(
@@ -144,6 +145,7 @@ interface FieldError {
 function rowToEvent(
   cells: readonly string[],
   role: Role,
+  idPrefix: string,
 ): { event: Event | null; errors: FieldError[] } {
   const errors: FieldError[] = [];
   const cell = (column: Column): string => cells[CSV_COLUMNS.indexOf(column)];
@@ -154,8 +156,8 @@ function rowToEvent(
   const id = cell('id');
   if (id === '') {
     fail('id', '必須です');
-  } else if (!id.startsWith(ID_PREFIX) || id.length <= ID_PREFIX.length) {
-    fail('id', `「${id}」は ${ID_PREFIX} で始めてください`);
+  } else if (!id.startsWith(idPrefix) || id.length <= idPrefix.length) {
+    fail('id', `「${id}」は ${idPrefix} で始めてください`);
   }
 
   const yearText = cell('year');

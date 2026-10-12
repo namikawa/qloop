@@ -1,7 +1,10 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Attempt, Pattern, Session, Settings } from '../core/models';
-import { openDb, type QLoopDb } from './db';
+import { deckModel } from '../core/decks';
+import type { Attempt, Era, Event, Pattern, Session, Settings } from '../core/models';
+import { generateReviewSession, reviewCandidates } from '../core/review';
+import { summarizeStats } from '../core/stats';
+import { openDb, type QLoopDb, type StoredSession } from './db';
 import { ProgressStore, type StartSessionInput } from './progress-store';
 import { ImportFormatError, type ProgressExport } from './transfer';
 
@@ -52,7 +55,11 @@ async function createStore(db?: QLoopDb): Promise<{ store: ProgressStore; db: QL
   return { store, db: database };
 }
 
+/** 日本史年表の教材の id（1.0 の記録はこの教材のものとして読む）。 */
+const HISTORY = 'japanese-history';
+
 const NORMAL: StartSessionInput = {
+  deckId: HISTORY,
   mode: 'normal',
   pattern: 'mixed',
   range: { kind: 'all' },
@@ -65,6 +72,7 @@ describe('ProgressStore.startSession', () => {
     const session = await store.startSession(NORMAL);
     expect(session).toEqual({
       id: session.id,
+      deckId: HISTORY,
       mode: 'normal',
       pattern: 'mixed',
       range: { kind: 'all' },
@@ -423,12 +431,12 @@ describe('ProgressStore の設定', () => {
 
   it('保存した設定を読み込み直しても同じ内容で返す', async () => {
     const first = await createStore();
-    expect(first.store.getSettings()).toBeNull();
-    await first.store.saveSettings(settings);
-    expect(first.store.getSettings()).toEqual(settings);
+    expect(first.store.getSettings(HISTORY)).toBeNull();
+    await first.store.saveSettings(HISTORY, settings);
+    expect(first.store.getSettings(HISTORY)).toEqual(settings);
 
     const { store } = await createStore(first.db);
-    expect(store.getSettings()).toEqual(settings);
+    expect(store.getSettings(HISTORY)).toEqual(settings);
 
     const next: Settings = {
       scope: 'core',
@@ -436,9 +444,9 @@ describe('ProgressStore の設定', () => {
       count: 'all',
       range: { kind: 'eras', eras: ['江戸'] },
     };
-    await store.saveSettings(next);
+    await store.saveSettings(HISTORY, next);
     const again = await createStore(first.db);
-    expect(again.store.getSettings()).toEqual(next);
+    expect(again.store.getSettings(HISTORY)).toEqual(next);
   });
 
   it('scope の無い（PR 3 より前の）設定は、基本の年表のみ（core）として読む', async () => {
@@ -448,7 +456,7 @@ describe('ProgressStore の設定', () => {
       value: { pattern: 'choice', count: 20, range: { kind: 'all' } },
     });
     const { store } = await createStore(db);
-    expect(store.getSettings()).toEqual({
+    expect(store.getSettings(HISTORY)).toEqual({
       scope: 'core',
       pattern: 'choice',
       count: 20,
@@ -475,7 +483,7 @@ describe('データベースの開き直し', () => {
       correct: false,
       endSession: true,
     });
-    await first.store.saveSettings({
+    await first.store.saveSettings(HISTORY, {
       scope: 'core',
       pattern: 'yearInput',
       count: 10,
@@ -493,7 +501,7 @@ describe('データベースの開き直し', () => {
     });
     expect(store.getEventStats('demo-0002', 'choice')).toMatchObject({ attempts: 1, correct: 0 });
     expect(store.getStudyDays()).toEqual(['2026-10-11']);
-    expect(store.getSettings()).toEqual({
+    expect(store.getSettings(HISTORY)).toEqual({
       scope: 'core',
       pattern: 'yearInput',
       count: 10,
@@ -534,7 +542,13 @@ async function seed(store: ProgressStore): Promise<{ first: Session; second: Ses
   advance(1000);
   await answer(store, first.id, 'jh-0002', 'yearInput', true, true);
   advance(DAY);
-  const second = await store.startSession({ mode: 'review', pattern: null, range: null, total: 2 });
+  const second = await store.startSession({
+    deckId: HISTORY,
+    mode: 'review',
+    pattern: null,
+    range: null,
+    total: 2,
+  });
   advance(1000);
   await answer(store, second.id, 'jh-0001', 'yearInput', true);
   advance(1000);
@@ -546,7 +560,8 @@ const byKey = <T extends { eventId: string; pattern: string }>(records: T[]) =>
   [...records].sort((a, b) =>
     `${a.eventId}:${a.pattern}`.localeCompare(`${b.eventId}:${b.pattern}`),
   );
-const byId = (sessions: Session[]) => [...sessions].sort((a, b) => a.id.localeCompare(b.id));
+const byId = <T extends { id: string }>(sessions: T[]) =>
+  [...sessions].sort((a, b) => a.id.localeCompare(b.id));
 
 describe('ProgressStore.rebuild', () => {
   it('attempts から eventStats・sessions の件数・studyDays を復元する（他の項目と設定はそのまま）', async () => {
@@ -558,7 +573,8 @@ describe('ProgressStore.rebuild', () => {
       count: 20,
       range: { kind: 'all' },
     };
-    await store.saveSettings(settings);
+    await store.saveSettings(HISTORY, settings);
+    await store.saveLastDeck(HISTORY);
     const expectedStats = byKey(await db.getAll('eventStats'));
     const expectedSessions = byId(await db.getAll('sessions'));
     expect(expectedSessions).toHaveLength(2);
@@ -580,7 +596,8 @@ describe('ProgressStore.rebuild', () => {
     expect(byKey(store.listEventStats())).toEqual(expectedStats);
     expect(byId(store.listSessions())).toEqual(expectedSessions);
     expect(store.getStudyDays()).toEqual(['2026-10-11', '2026-10-12']);
-    expect(store.getSettings()).toEqual(settings);
+    expect(store.getSettings(HISTORY)).toEqual(settings);
+    expect(store.getLastDeck()).toBe(HISTORY);
   });
 
   it('最後の回答・最後の不正解は記録した順で決め、回答の無いセッションは 0 件にする', async () => {
@@ -645,7 +662,7 @@ describe('ProgressStore.exportData と importData', () => {
     const { store, db } = await createStore();
     const { first, second } = await seed(store);
     const data = await store.exportData();
-    expect(data.schemaVersion).toBe(1);
+    expect(data.schemaVersion).toBe(2);
     expect(data.exportedAt).toBe(current.toISOString());
     expect(data.attempts).toEqual(await db.getAll('attempts'));
     expect(data.attempts.map((attempt) => attempt.id)).toEqual([1, 2, 3, 4, 5]);
@@ -716,15 +733,16 @@ describe('ProgressStore.exportData と importData', () => {
     const { store, db } = await createStore();
     const old = await store.startSession(NORMAL);
     await answer(store, old.id, 'jh-0009', 'choice', true);
-    await store.saveSettings({
+    await store.saveSettings(HISTORY, {
       scope: 'all',
       pattern: 'choice',
       count: 20,
       range: { kind: 'all' },
     });
+    await store.saveLastDeck(HISTORY);
 
     const imported: ProgressExport = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       exportedAt: '2026-10-01T00:00:00.000Z',
       attempts: [
         {
@@ -747,6 +765,7 @@ describe('ProgressStore.exportData と importData', () => {
       sessions: [
         {
           id: 'imported',
+          deckId: HISTORY,
           mode: 'normal',
           pattern: 'yearInput',
           range: { kind: 'years', from: 700, to: 1600 },
@@ -781,6 +800,8 @@ describe('ProgressStore.exportData と importData', () => {
       },
     ]);
     expect(await db.get('meta', 'settings')).toBeUndefined();
+    expect(await db.get('meta', `settings:${HISTORY}`)).toBeUndefined();
+    expect(await db.get('meta', 'lastDeck')).toBeUndefined();
     expect(await db.get('meta', 'studyDays')).toEqual({ key: 'studyDays', value: ['2026-10-01'] });
 
     // メモリ上の状態も読み込んだ内容になる
@@ -789,13 +810,14 @@ describe('ProgressStore.exportData と importData', () => {
     expect(store.getSession(old.id)).toBeUndefined();
     expect(store.listSessions()).toEqual([{ ...imported.sessions[0], answered: 2, correct: 1 }]);
     expect(store.getStudyDays()).toEqual(['2026-10-01']);
-    expect(store.getSettings()).toBeNull();
+    expect(store.getSettings(HISTORY)).toBeNull();
+    expect(store.getLastDeck()).toBeNull();
   });
 
   it.each([
     [
       'schemaVersion が違う',
-      { schemaVersion: 2, exportedAt: '2026-10-01T00:00:00.000Z', attempts: [], sessions: [] },
+      { schemaVersion: 3, exportedAt: '2026-10-01T00:00:00.000Z', attempts: [], sessions: [] },
       /schemaVersion/,
     ],
     [
@@ -825,7 +847,7 @@ describe('ProgressStore.exportData と importData', () => {
   ])('形式が不正（%s）なら理由を含む例外を投げ、何も変えない', async (_label, data, reason) => {
     const { store, db } = await createStore();
     await seed(store);
-    await store.saveSettings({
+    await store.saveSettings(HISTORY, {
       scope: 'all',
       pattern: 'choice',
       count: 20,
@@ -850,7 +872,7 @@ describe('ProgressStore.exportData と importData', () => {
     expect(await db.getAll('meta')).toEqual(before.meta);
     expect(store.listEventStats()).toEqual(before.memoryStats);
     expect(store.listSessions()).toEqual(before.memorySessions);
-    expect(store.getSettings()).toMatchObject({ scope: 'all' });
+    expect(store.getSettings(HISTORY)).toMatchObject({ scope: 'all' });
   });
 
   it('全置換の途中（再計算）で失敗したら、読み込み前の状態に戻る', async () => {
@@ -891,12 +913,13 @@ describe('ProgressStore.reset', () => {
   it('全ストアを空にし、メモリ上の状態も初期化する', async () => {
     const { store, db } = await createStore();
     await seed(store);
-    await store.saveSettings({
+    await store.saveSettings(HISTORY, {
       scope: 'all',
       pattern: 'choice',
       count: 20,
       range: { kind: 'all' },
     });
+    await store.saveLastDeck(HISTORY);
 
     await store.reset();
     expect(await db.count('attempts')).toBe(0);
@@ -906,12 +929,344 @@ describe('ProgressStore.reset', () => {
     expect(store.listEventStats()).toEqual([]);
     expect(store.listSessions()).toEqual([]);
     expect(store.getStudyDays()).toEqual([]);
-    expect(store.getSettings()).toBeNull();
+    expect(store.getSettings(HISTORY)).toBeNull();
+    expect(store.getLastDeck()).toBeNull();
 
     // リセットの後も記録を続けられる
     const session = await store.startSession(NORMAL);
     await answer(store, session.id, 'jh-0001', 'choice', true);
     expect(store.listEventStats()).toHaveLength(1);
     expect(await db.count('attempts')).toBe(1);
+  });
+});
+
+/** データベースのセッションから `deckId` を消して、1.0 の記録と同じ形にする。 */
+async function stripDeckIds(db: QLoopDb): Promise<void> {
+  for (const session of await db.getAll('sessions')) {
+    const legacy: StoredSession = { ...session };
+    delete legacy.deckId;
+    await db.put('sessions', legacy);
+  }
+}
+
+/** 1.0 の形のセッション（`deckId` が無い）。 */
+function legacySession(id: string, extra: Partial<StoredSession> = {}): StoredSession {
+  return {
+    id,
+    mode: 'normal',
+    pattern: 'yearInput',
+    range: { kind: 'all' },
+    startedAt: '2026-10-01T00:00:00.000Z',
+    endedAt: '2026-10-01T00:05:00.000Z',
+    total: 10,
+    answered: 1,
+    correct: 1,
+    ...extra,
+  };
+}
+
+describe('1.0 の記録（deckId の無いセッション）', () => {
+  it('IndexedDB から読むと、deckId は日本史年表（japanese-history）になる', async () => {
+    const db = await open();
+    await db.put('sessions', legacySession('legacy'));
+    const { store } = await createStore(db);
+    expect(store.getSession('legacy')).toEqual({ ...legacySession('legacy'), deckId: HISTORY });
+    expect(store.listSessions().map((session) => session.deckId)).toEqual([HISTORY]);
+  });
+
+  it('回答・途中終了で書き戻すときに deckId を補う', async () => {
+    const db = await open();
+    await db.put('sessions', legacySession('answering', { endedAt: null, total: 3 }));
+    await db.put('sessions', legacySession('ending', { endedAt: null }));
+    const { store } = await createStore(db);
+
+    await answer(store, 'answering', 'jh-0001', 'choice', true);
+    expect(await db.get('sessions', 'answering')).toMatchObject({ deckId: HISTORY, answered: 2 });
+    expect(store.getSession('answering')).toMatchObject({ deckId: HISTORY, answered: 2 });
+
+    await store.endSession('ending');
+    expect(await db.get('sessions', 'ending')).toMatchObject({
+      deckId: HISTORY,
+      endedAt: current.toISOString(),
+    });
+    expect(store.getSession('ending')?.deckId).toBe(HISTORY);
+  });
+
+  it('再計算でも deckId を補い、書き出しは版 2 で各セッションに deckId を入れる', async () => {
+    const { store, db } = await createStore();
+    await seed(store);
+    await stripDeckIds(db);
+    const reloaded = await createStore(db);
+
+    const data = await reloaded.store.exportData();
+    expect(data.schemaVersion).toBe(2);
+    expect(data.sessions.map((session) => session.deckId)).toEqual([HISTORY, HISTORY]);
+
+    await reloaded.store.rebuild();
+    expect((await db.getAll('sessions')).map((session) => session.deckId)).toEqual([
+      HISTORY,
+      HISTORY,
+    ]);
+    expect(reloaded.store.listSessions().map((session) => session.deckId)).toEqual([
+      HISTORY,
+      HISTORY,
+    ]);
+  });
+
+  it('1.0 の記録を版 2 で書き出し、空のデータベースに読み込むと、回答・セッション・集計が一致する', async () => {
+    // 1.0 のアプリが残した記録（deckId の無いセッションと、その回答・集計・学習日・出題設定）
+    const source = await createStore();
+    const { first, second } = await seed(source.store);
+    await stripDeckIds(source.db);
+    await source.db.put('meta', {
+      key: 'settings',
+      value: { scope: 'all', pattern: 'choice', count: 20, range: { kind: 'all' } },
+    });
+    const legacy = await createStore(source.db);
+    const json = JSON.stringify(await legacy.store.exportData());
+
+    dbName = `${dbName}-target`;
+    const target = await createStore();
+    await target.store.importData(JSON.parse(json));
+
+    const stripId = (attempts: Attempt[]) =>
+      attempts.map(({ eventId, pattern, correct, answeredAt, sessionId }) => ({
+        eventId,
+        pattern,
+        correct,
+        answeredAt,
+        sessionId,
+      }));
+    expect(stripId(await target.db.getAll('attempts'))).toEqual(
+      stripId(await source.db.getAll('attempts')),
+    );
+    expect(byKey(await target.db.getAll('eventStats'))).toEqual(
+      byKey(await source.db.getAll('eventStats')),
+    );
+    // セッションは deckId（日本史年表）が補われる以外は同じ
+    const legacySessions = byId(await source.db.getAll('sessions'));
+    expect(legacySessions.every((session) => session.deckId === undefined)).toBe(true);
+    expect(byId(await target.db.getAll('sessions'))).toEqual(
+      legacySessions.map((session) => ({ ...session, deckId: HISTORY })),
+    );
+    expect(await target.db.get('meta', 'studyDays')).toEqual(
+      await source.db.get('meta', 'studyDays'),
+    );
+    expect(byKey(target.store.listEventStats())).toEqual(byKey(legacy.store.listEventStats()));
+    expect(target.store.listSessions()).toEqual(legacy.store.listSessions());
+    expect(target.store.getStudyDays()).toEqual(legacy.store.getStudyDays());
+    expect(target.store.getSession(first.id)).toMatchObject({ deckId: HISTORY, answered: 3 });
+    expect(target.store.getSession(second.id)).toMatchObject({ deckId: HISTORY, answered: 2 });
+  });
+});
+
+describe('教材ごとの出題設定と最後に選んだ教材', () => {
+  const legacySettings: Settings = {
+    scope: 'all',
+    pattern: 'choice',
+    count: 20,
+    range: { kind: 'all' },
+  };
+  const historySettings: Settings = {
+    scope: 'core',
+    pattern: 'yearChoice',
+    count: 'all',
+    range: { kind: 'eras', eras: ['江戸'] },
+  };
+  const otherSettings: Settings = {
+    scope: 'all',
+    pattern: 'mixed',
+    count: 10,
+    range: { kind: 'years', from: 1600, to: null },
+  };
+
+  it('1.0 の settings は日本史年表の設定として読み、他の教材には使わない', async () => {
+    const db = await open();
+    await db.put('meta', { key: 'settings', value: legacySettings });
+    const { store } = await createStore(db);
+    expect(store.getSettings(HISTORY)).toEqual(legacySettings);
+    expect(store.getSettings('other-deck')).toBeNull();
+  });
+
+  it('settings:japanese-history があれば、1.0 の settings より優先する', async () => {
+    const db = await open();
+    await db.put('meta', { key: 'settings', value: legacySettings });
+    await db.put('meta', { key: `settings:${HISTORY}`, value: historySettings });
+    const { store } = await createStore(db);
+    expect(store.getSettings(HISTORY)).toEqual(historySettings);
+  });
+
+  it('保存すると settings:<教材の id> に書き、1.0 の settings より優先して読む', async () => {
+    const db = await open();
+    await db.put('meta', { key: 'settings', value: legacySettings });
+    const first = await createStore(db);
+    await first.store.saveSettings(HISTORY, historySettings);
+    expect(await db.get('meta', `settings:${HISTORY}`)).toEqual({
+      key: `settings:${HISTORY}`,
+      value: historySettings,
+    });
+    expect(first.store.getSettings(HISTORY)).toEqual(historySettings);
+    const { store } = await createStore(db);
+    expect(store.getSettings(HISTORY)).toEqual(historySettings);
+  });
+
+  it('教材ごとの設定を別々に保存・読込する', async () => {
+    const first = await createStore();
+    await first.store.saveSettings(HISTORY, historySettings);
+    await first.store.saveSettings('other-deck', otherSettings);
+    expect(first.store.getSettings(HISTORY)).toEqual(historySettings);
+    expect(first.store.getSettings('other-deck')).toEqual(otherSettings);
+
+    const { store } = await createStore(first.db);
+    expect(store.getSettings(HISTORY)).toEqual(historySettings);
+    expect(store.getSettings('other-deck')).toEqual(otherSettings);
+    expect(store.getSettings('unknown-deck')).toBeNull();
+    // 片方を保存し直しても、もう片方は変わらない
+    await store.saveSettings('other-deck', { ...otherSettings, count: 20 });
+    const again = await createStore(first.db);
+    expect(again.store.getSettings(HISTORY)).toEqual(historySettings);
+    expect(again.store.getSettings('other-deck')).toEqual({ ...otherSettings, count: 20 });
+  });
+
+  it('lastDeck を保存し、読み込み直しても同じ id を返す（保存が無ければ null）', async () => {
+    const first = await createStore();
+    expect(first.store.getLastDeck()).toBeNull();
+    await first.store.saveLastDeck('other-deck');
+    expect(first.store.getLastDeck()).toBe('other-deck');
+    expect(await first.db.get('meta', 'lastDeck')).toEqual({
+      key: 'lastDeck',
+      value: 'other-deck',
+    });
+
+    const { store } = await createStore(first.db);
+    expect(store.getLastDeck()).toBe('other-deck');
+    await store.saveLastDeck(HISTORY);
+    const again = await createStore(first.db);
+    expect(again.store.getLastDeck()).toBe(HISTORY);
+  });
+});
+
+describe('2 つの教材の記録', () => {
+  /** 年の離れた出来事を 6 件作る（どれも 3 つのパターンに適格）。 */
+  const eventsOf = (prefix: string, era: Era): Event[] =>
+    Array.from({ length: 6 }, (_, i) => ({
+      id: `${prefix}${i + 1}`,
+      year: 1000 + i * 100,
+      title: `${prefix}${i + 1} の出来事`,
+      era,
+      approx: false,
+      altYears: [],
+      yearLabel: null,
+      level: '中学',
+      role: 'core',
+    }));
+  // 2 つ目の教材はテスト用の定義（年表の種類で、id の接頭辞は th-）
+  const history = deckModel({
+    id: HISTORY,
+    kind: 'timeline',
+    name: '日本史年表',
+    items: eventsOf('jh-', '平安'),
+  });
+  const other = deckModel({
+    id: 'test-history',
+    kind: 'timeline',
+    name: 'テスト年表',
+    items: eventsOf('th-', '江戸'),
+  });
+  const UTC = (date: Date) => date.toISOString().slice(0, 10);
+
+  it('復習の候補・成績・履歴・出題設定は教材ごとに分かれ、連続学習日数は共通になる', async () => {
+    const { store, db } = await createStore();
+    // 1 日目: 日本史年表
+    const historySession = await store.startSession({ ...NORMAL, deckId: history.deck.id });
+    await answer(store, historySession.id, 'jh-1', 'yearInput', false);
+    await answer(store, historySession.id, 'jh-2', 'choice', true, true);
+    await store.saveSettings(history.deck.id, {
+      scope: 'core',
+      pattern: 'yearInput',
+      count: 10,
+      range: { kind: 'all' },
+    });
+    // 2 日目: テスト年表
+    advance(DAY);
+    const otherSession = await store.startSession({ ...NORMAL, deckId: other.deck.id });
+    await answer(store, otherSession.id, 'th-1', 'yearInput', false);
+    await answer(store, otherSession.id, 'th-2', 'yearChoice', false);
+    await answer(store, otherSession.id, 'th-3', 'choice', true, true);
+    await store.saveSettings(other.deck.id, {
+      scope: 'all',
+      pattern: 'mixed',
+      count: 20,
+      range: { kind: 'eras', eras: ['江戸'] },
+    });
+
+    const candidatesOf = (model: typeof history) =>
+      reviewCandidates({
+        population: model.population,
+        allItems: model.deck.items,
+        stats: store.listEventStats(),
+        now: current,
+        dateKey: UTC,
+        rules: model.rules,
+      });
+    const statsOf = (model: typeof history) =>
+      summarizeStats({
+        deckId: model.deck.id,
+        population: model.population,
+        stats: store.listEventStats(),
+        sessions: store.listSessions(),
+        studyDays: store.getStudyDays(),
+        now: current,
+        dateKey: UTC,
+        rules: model.rules,
+      });
+
+    // 復習の候補はその教材の項目だけ
+    expect(candidatesOf(history).map(({ item, pattern }) => [item.id, pattern])).toEqual([
+      ['jh-1', 'yearInput'],
+    ]);
+    expect(candidatesOf(other).map(({ item, pattern }) => [item.id, pattern])).toEqual([
+      ['th-1', 'yearInput'],
+      ['th-2', 'yearChoice'],
+    ]);
+    const reviewQuestions = generateReviewSession({
+      candidates: candidatesOf(other),
+      allItems: other.deck.items,
+      count: 'all',
+      currentYear: 2026,
+      rng: () => 0.5,
+      rules: other.rules,
+    });
+    expect(reviewQuestions.map((question) => question.item.id).sort()).toEqual(['th-1', 'th-2']);
+
+    // 成績（全体・時代別・出来事別）と履歴はその教材の分だけ。連続学習日数は共通
+    const historyStats = statsOf(history);
+    const otherStats = statsOf(other);
+    expect(historyStats.overall).toEqual({ attempts: 2, correct: 1, streakDays: 2 });
+    expect(otherStats.overall).toEqual({ attempts: 3, correct: 1, streakDays: 2 });
+    expect(historyStats.groups).toEqual([{ group: '平安', attempts: 2, correct: 1 }]);
+    expect(otherStats.groups).toEqual([{ group: '江戸', attempts: 3, correct: 1 }]);
+    expect(historyStats.items.filter((row) => row.attempts > 0).map((row) => row.item.id)).toEqual([
+      'jh-1',
+      'jh-2',
+    ]);
+    expect(otherStats.items.filter((row) => row.attempts > 0).map((row) => row.item.id)).toEqual([
+      'th-1',
+      'th-2',
+      'th-3',
+    ]);
+    expect(historyStats.history.map((session) => session.id)).toEqual([historySession.id]);
+    expect(otherStats.history.map((session) => session.id)).toEqual([otherSession.id]);
+
+    // 出題設定は教材ごと
+    expect(store.getSettings(history.deck.id)).toMatchObject({ pattern: 'yearInput' });
+    expect(store.getSettings(other.deck.id)).toMatchObject({ pattern: 'mixed' });
+
+    // 読み込み直しても分かれたまま
+    const reloaded = await createStore(db);
+    expect(reloaded.store.getSession(historySession.id)?.deckId).toBe(history.deck.id);
+    expect(reloaded.store.getSession(otherSession.id)?.deckId).toBe(other.deck.id);
+    expect(reloaded.store.getSettings(history.deck.id)).toMatchObject({ pattern: 'yearInput' });
+    expect(reloaded.store.getSettings(other.deck.id)).toMatchObject({ pattern: 'mixed' });
   });
 });

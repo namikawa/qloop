@@ -12,10 +12,15 @@ export interface DeckEvent {
   role: string;
 }
 
-/** deck.json は webServer のビルドで生成されるので、テストの中で読む。 */
+/**
+ * 日本史年表の教材の全出来事。decks.json は webServer のビルドで生成されるので、テストの中で読む。
+ */
 export function readDeckEvents(): DeckEvent[] {
-  const path = new URL('../../src/generated/deck.json', import.meta.url);
-  return (JSON.parse(readFileSync(path, 'utf8')) as { events: DeckEvent[] }).events;
+  const path = new URL('../../src/generated/decks.json', import.meta.url);
+  const decks = JSON.parse(readFileSync(path, 'utf8')) as { id: string; items: DeckEvent[] }[];
+  const deck = decks.find((candidate) => candidate.id === 'japanese-history');
+  expect(deck, 'decks.json に日本史年表が無い').toBeDefined();
+  return deck!.items;
 }
 
 /** 出題の母集団（core.csv と pool.csv の中学の出来事）。 */

@@ -1,17 +1,16 @@
 import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
 import { formatLocalDate, formatLocalDateTime } from '../../core/date';
-import type { Event } from '../../core/models';
+import type { KindRules } from '../../core/decks';
+import type { Item, Pattern } from '../../core/models';
 import {
   accuracyOf,
   describeSession,
   formatAccuracy,
   isInterrupted,
-  PATTERN_LABELS,
-  sortEventRows,
+  sortItemRows,
   summarizeStats,
-  type EventSortOrder,
+  type ItemSortOrder,
 } from '../../core/stats';
-import { formatEventYear } from '../../core/year';
 import type { ProgressStore } from '../../storage/progress-store';
 import { exportFileName, parseProgressJson, type ProgressExport } from '../../storage/transfer';
 import { Bar } from '../components/Bar';
@@ -28,24 +27,24 @@ import {
 } from '../export-file';
 
 /** 成績の画面の切り替え。 */
-type StatsView = 'overall' | 'events' | 'history';
+type StatsView = 'overall' | 'items' | 'history';
 
-const VIEW_OPTIONS: { value: StatsView; label: string }[] = [
-  { value: 'overall', label: '全体' },
-  { value: 'events', label: '出来事別' },
-  { value: 'history', label: '履歴' },
-];
-
-const SORT_OPTIONS: { value: EventSortOrder; label: string }[] = [
+const SORT_OPTIONS: { value: ItemSortOrder; label: string }[] = [
   { value: 'accuracy', label: '正答率の低い順' },
   { value: 'attempts', label: '回答数の多い順' },
   { value: 'recent', label: '最終回答日の新しい順' },
 ];
 
-interface StatsProps {
+interface StatsProps<I extends Item, P extends Pattern> {
   store: ProgressStore;
-  /** 出題の母集団（成績は「出題する出来事」の設定によらず母集団全体を対象にする）。 */
-  population: readonly Event[];
+  /** 選んだ教材の id（履歴をこの教材のセッションに絞る）。 */
+  deckId: string;
+  /** 見出しの下に出す教材の名前（教材が 1 つのときは無し）。 */
+  deckName?: string;
+  /** 選んだ教材の母集団（成績は「出題する項目」の設定によらず母集団全体を対象にする）。 */
+  population: readonly I[];
+  /** その教材の種類の差分（まとめる単位・パターンの表示名・項目の表示・画面の言葉）。 */
+  rules: KindRules<I, P>;
   onBack: () => void;
 }
 
@@ -69,15 +68,28 @@ function AccuracyFigure({ text }: { text: string }) {
 }
 
 /**
- * 成績の画面（設計書 8 章）。全体・時代別・出来事別・履歴の 4 区分と、書き出し・読み込み・リセットの操作。
+ * 成績の画面（設計書 8 章）。選んだ教材の、全体・まとめる単位ごと（年表は時代別）・項目別（年表は出来事別）・履歴の
+ * 4 区分と、書き出し・読み込み・リセットの操作（記録の管理は全教材をまとめて扱う）。
  * 「全体」（全体・時代別・記録の管理）、「出来事別」、「履歴」を切り替えて出す。
  * 集計は ProgressStore の状態からその場で行う（起動後の回答も反映される）。
  */
-export function Stats({ store, population, onBack }: StatsProps) {
+export function Stats<I extends Item, P extends Pattern>({
+  store,
+  deckId,
+  deckName,
+  population,
+  rules,
+  onBack,
+}: StatsProps<I, P>) {
+  const viewOptions: { value: StatsView; label: string }[] = [
+    { value: 'overall', label: '全体' },
+    { value: 'items', label: `${rules.labels.item}別` },
+    { value: 'history', label: '履歴' },
+  ];
   const [view, setView] = useState<StatsView>('overall');
   // 集計の基準の時刻。読み込みやリセットの後に更新して、集計をやり直す
   const [now, setNow] = useState(() => new Date());
-  const [sortOrder, setSortOrder] = useState<EventSortOrder>('accuracy');
+  const [sortOrder, setSortOrder] = useState<ItemSortOrder>('accuracy');
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
   const [prepared, setPrepared] = useState<PreparedExport | null>(null);
   const [pendingImport, setPendingImport] = useState<ProgressExport | null>(null);
@@ -97,21 +109,23 @@ export function Stats({ store, population, onBack }: StatsProps) {
   }, [prepared]);
 
   const summary = summarizeStats({
+    deckId,
     population,
     stats: store.listEventStats(),
     sessions: store.listSessions(),
     studyDays: store.getStudyDays(),
     now,
+    rules,
   });
-  const rows = sortEventRows(summary.events, sortOrder);
+  const rows = sortItemRows(summary.items, sortOrder);
 
-  const toggleRow = (eventId: string) => {
+  const toggleRow = (itemId: string) => {
     setExpanded((previous) => {
       const next = new Set(previous);
-      if (next.has(eventId)) {
-        next.delete(eventId);
+      if (next.has(itemId)) {
+        next.delete(itemId);
       } else {
-        next.add(eventId);
+        next.add(itemId);
       }
       return next;
     });
@@ -200,18 +214,18 @@ export function Stats({ store, population, onBack }: StatsProps) {
     setNow(new Date());
   };
 
-  const { overall, eras, history } = summary;
+  const { overall, groups, history } = summary;
   const accuracyText = formatAccuracy(overall);
 
   return (
     <div className="screen stats-screen">
-      <ScreenHeader title="成績" onBack={onBack} />
+      <ScreenHeader title="成績" deckName={deckName} onBack={onBack} />
 
       <Segmented
         legend="成績の表示"
         legendHidden
         name="stats-view"
-        options={VIEW_OPTIONS}
+        options={viewOptions}
         value={view}
         onChange={setView}
       />
@@ -247,17 +261,17 @@ export function Stats({ store, population, onBack }: StatsProps) {
 
             <section aria-labelledby="stats-eras">
               <h2 id="stats-eras" className="section-label">
-                時代別
+                {rules.labels.group}別
               </h2>
               <ul className="card card-flat era-list">
-                {eras.map((era) => (
-                  <li key={era.era} className="era-row" data-testid="era-row">
-                    <span className="era-name">{era.era}</span>
-                    <Bar ratio={accuracyOf(era)} />
+                {groups.map((group) => (
+                  <li key={group.group} className="era-row" data-testid="era-row">
+                    <span className="era-name">{group.group}</span>
+                    <Bar ratio={accuracyOf(group)} />
                     <span className="era-figure">
-                      {era.attempts === 0
+                      {group.attempts === 0
                         ? '未回答'
-                        : `${formatAccuracy(era)}（${era.attempts} 回）`}
+                        : `${formatAccuracy(group)}（${group.attempts} 回）`}
                     </span>
                   </li>
                 ))}
@@ -348,7 +362,7 @@ export function Stats({ store, population, onBack }: StatsProps) {
           </>
         )}
 
-        {view === 'events' && (
+        {view === 'items' && (
           <>
             <div className="sort-row">
               <label htmlFor={sortId} className="sort-label">
@@ -360,7 +374,7 @@ export function Stats({ store, population, onBack }: StatsProps) {
                   className="select"
                   value={sortOrder}
                   onChange={(changeEvent) =>
-                    setSortOrder(changeEvent.target.value as EventSortOrder)
+                    setSortOrder(changeEvent.target.value as ItemSortOrder)
                   }
                 >
                   {SORT_OPTIONS.map((option) => (
@@ -374,21 +388,21 @@ export function Stats({ store, population, onBack }: StatsProps) {
             </div>
             <ul className="card card-flat list-card event-list">
               {rows.map((row) => {
-                const open = expanded.has(row.event.id);
-                const sub = [formatEventYear(row.event)];
+                const open = expanded.has(row.item.id);
+                const sub = [rules.itemDetail(row.item)];
                 if (row.lastAnsweredAt !== null) {
                   sub.push(`${row.attempts} 回`, formatLocalDate(new Date(row.lastAnsweredAt)));
                 }
                 return (
-                  <li key={row.event.id} className="event-item" data-testid="event-row">
+                  <li key={row.item.id} className="event-item" data-testid="event-row">
                     <button
                       type="button"
                       className="event-row"
                       aria-expanded={open}
-                      onClick={() => toggleRow(row.event.id)}
+                      onClick={() => toggleRow(row.item.id)}
                     >
                       <span className="event-row-main">
-                        <span className="event-row-title">{row.event.title}</span>
+                        <span className="event-row-title">{rules.itemTitle(row.item)}</span>
                         <span className="event-row-sub">{sub.join(' · ')}</span>
                       </span>
                       <span className="event-row-accuracy">{formatAccuracy(row)}</span>
@@ -402,7 +416,7 @@ export function Stats({ store, population, onBack }: StatsProps) {
                           row.patterns.map((pattern) => (
                             <li key={pattern.pattern} className="breakdown-item">
                               <span className="breakdown-name">
-                                {PATTERN_LABELS[pattern.pattern]}
+                                {rules.patternLabel(pattern.pattern)}
                               </span>
                               <span className="breakdown-figure">
                                 {formatAccuracy(pattern)}（{pattern.correct} / {pattern.attempts}
@@ -440,7 +454,7 @@ export function Stats({ store, population, onBack }: StatsProps) {
                       </span>
                     </div>
                     <p className="history-meta">
-                      <span>{describeSession(session)}</span>
+                      <span>{describeSession(session, rules)}</span>
                       {isInterrupted(session) && <span className="history-badge">中断</span>}
                     </p>
                   </li>

@@ -10,12 +10,14 @@ import {
   type Session,
   type SessionMode,
 } from '../core/models';
+import { LEGACY_DECK_ID } from './db';
 
 /**
- * 成績の書き出しと読み込みの形式（設計書 5.6 節）。
+ * 成績の書き出しと読み込みの形式（設計書 5.6 節）。全教材の記録を 1 つのファイルに入れる。
  * `attempts` が正本で、読み込んだ後に `eventStats`・セッションの件数・`studyDays` を再計算する。
+ * 版 2 で `sessions` の各項目に `deckId` を足した。読み込みは版 1 と 2 を受け付ける。
  */
-export const EXPORT_SCHEMA_VERSION = 1;
+export const EXPORT_SCHEMA_VERSION = 2;
 
 export interface ProgressExport {
   schemaVersion: typeof EXPORT_SCHEMA_VERSION;
@@ -23,6 +25,7 @@ export interface ProgressExport {
   exportedAt: string;
   /** 回答の記録の全件（`id` は読み込むときに捨てて、自動採番に任せる）。 */
   attempts: Attempt[];
+  /** セッションの全件（全教材の分。各項目に `deckId` を持つ）。 */
   sessions: Session[];
 }
 
@@ -55,17 +58,21 @@ const SESSION_MODE_KEYS: Record<SessionMode, true> = { normal: true, review: tru
 const SESSION_MODES: readonly SessionMode[] = Object.keys(SESSION_MODE_KEYS) as SessionMode[];
 
 /**
- * 読み込んだ値の形式を検証し、知らない項目を除いた新しいオブジェクトにして返す（設計書 5.6 節）。
- * `schemaVersion` が 1 で、`attempts` と `sessions` が配列で各項目の型が合うこと。
+ * 読み込んだ値の形式を検証し、知らない項目を除いて版 2 の形にそろえた新しいオブジェクトにして返す（設計書 5.6 節）。
+ * `schemaVersion` が 1 か 2 で、`attempts` と `sessions` が配列で各項目の型が合うこと。
+ * セッションの `deckId` は、版 1 では無いので `LEGACY_DECK_ID`（日本史年表）を補い、版 2 では空でない文字列なら
+ * 今の教材に無い id もそのまま保つ。
  * 時刻は UTC の ISO 8601 文字列（`toISOString()` の形）にそろえる。合わなければ理由を入れた `ImportFormatError`。
  */
 export function parseProgressExport(value: unknown): ProgressExport {
   if (!isRecord(value)) {
     throw new ImportFormatError('成績の書き出しファイルの形式ではありません');
   }
-  if (value.schemaVersion !== EXPORT_SCHEMA_VERSION) {
+  // 版 1 は 1.0 の書き出しで、`sessions` に `deckId` が無い
+  const legacy = value.schemaVersion === 1;
+  if (!legacy && value.schemaVersion !== EXPORT_SCHEMA_VERSION) {
     throw new ImportFormatError(
-      `schemaVersion が ${EXPORT_SCHEMA_VERSION} ではありません（${describe(value.schemaVersion)}）`,
+      `schemaVersion が 1 か ${EXPORT_SCHEMA_VERSION} ではありません（${describe(value.schemaVersion)}）`,
     );
   }
   if (!Array.isArray(value.attempts)) {
@@ -79,7 +86,7 @@ export function parseProgressExport(value: unknown): ProgressExport {
     throw new ImportFormatError(`exportedAt が日時ではありません（${describe(value.exportedAt)}）`);
   }
   const attempts = value.attempts.map((item: unknown, index) => parseAttempt(item, index));
-  const sessions = value.sessions.map((item: unknown, index) => parseSession(item, index));
+  const sessions = value.sessions.map((item: unknown, index) => parseSession(item, index, legacy));
   const ids = new Set<string>();
   sessions.forEach((session, index) => {
     if (ids.has(session.id)) {
@@ -127,7 +134,8 @@ function parseAttempt(item: unknown, index: number): Attempt {
   };
 }
 
-function parseSession(item: unknown, index: number): Session {
+/** セッションを検証する。`legacy`（版 1）なら `deckId` を読まずに `LEGACY_DECK_ID` を補う。 */
+function parseSession(item: unknown, index: number, legacy: boolean): Session {
   const where = `sessions の ${index + 1} 件目`;
   if (!isRecord(item)) {
     throw new ImportFormatError(`${where}がオブジェクトではありません`);
@@ -136,6 +144,13 @@ function parseSession(item: unknown, index: number): Session {
     new ImportFormatError(`${where}: ${field} が不正です（${describe(item[field])}）`);
   if (typeof item.id !== 'string' || item.id === '') {
     throw fail('id');
+  }
+  let deckId = LEGACY_DECK_ID;
+  if (!legacy) {
+    if (typeof item.deckId !== 'string' || item.deckId === '') {
+      throw fail('deckId');
+    }
+    deckId = item.deckId;
   }
   if (!SESSION_MODES.includes(item.mode as SessionMode)) {
     throw fail('mode');
@@ -166,6 +181,7 @@ function parseSession(item: unknown, index: number): Session {
   }
   return {
     id: item.id,
+    deckId,
     mode: item.mode as SessionMode,
     pattern: item.pattern as PatternMode | null,
     range,

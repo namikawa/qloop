@@ -125,7 +125,7 @@ describe('population', () => {
       ev('pool', 1602, { role: 'pool' }),
       ev('pool-high', 1603, { role: 'pool', level: '高校' }),
     ];
-    expect(ids(population({ events }))).toEqual(['core', 'pool']);
+    expect(ids(population(events))).toEqual(['core', 'pool']);
   });
 });
 
@@ -242,7 +242,7 @@ describe('eligibleQuestions', () => {
 describe('generateSession', () => {
   const summarize = (questions: Question[]) =>
     questions.map((question) => ({
-      id: question.event.id,
+      id: question.item.id,
       pattern: question.pattern,
       choices: question.pattern === 'choice' ? ids(question.choices) : null,
       years: question.pattern === 'yearChoice' ? question.years : null,
@@ -260,7 +260,7 @@ describe('generateSession', () => {
         rng: mulberry32(1),
       });
       expect(questions).toHaveLength(count);
-      expect(new Set(questions.map((question) => question.event.id)).size).toBe(count);
+      expect(new Set(questions.map((question) => question.item.id)).size).toBe(count);
     }
   });
 
@@ -274,7 +274,7 @@ describe('generateSession', () => {
       currentYear: CURRENT_YEAR,
       rng: mulberry32(1),
     });
-    expect(ids(questions.map((question) => question.event)).sort()).toEqual(ids(events).sort());
+    expect(ids(questions.map((question) => question.item)).sort()).toEqual(ids(events).sort());
   });
 
   it('全問は適格な全件を出し、適格でない出来事は出さない', () => {
@@ -288,7 +288,7 @@ describe('generateSession', () => {
       rng: mulberry32(1),
     });
     expect(questions).toHaveLength(12);
-    expect(ids(questions.map((question) => question.event))).not.toContain('approx');
+    expect(ids(questions.map((question) => question.item))).not.toContain('approx');
     expect(questions.every((question) => question.pattern === 'yearInput')).toBe(true);
   });
 
@@ -304,7 +304,7 @@ describe('generateSession', () => {
           currentYear: CURRENT_YEAR,
           rng: mulberry32(seed),
         })
-          .map((question) => question.event.id)
+          .map((question) => question.item.id)
           .join(','),
       ),
     );
@@ -362,7 +362,7 @@ describe('generateSession', () => {
         count: 'all',
         currentYear: CURRENT_YEAR,
         rng: mulberry32(seed),
-      }).find((q) => q.event.id === 'approx');
+      }).find((q) => q.item.id === 'approx');
       expect(question?.pattern).toBe('choice');
     }
   });
@@ -384,11 +384,11 @@ describe('generateSession', () => {
       if (question.pattern === 'choice') {
         expect(question.choices).toHaveLength(4);
         expect(new Set(ids(question.choices)).size).toBe(4);
-        expect(question.choices).toContain(question.event);
+        expect(question.choices).toContain(question.item);
         expect(question).not.toHaveProperty('years');
       } else if (question.pattern === 'yearChoice') {
         expect(question.years).toHaveLength(4);
-        expect(question.years).toContain(question.event.year);
+        expect(question.years).toContain(question.item.year);
         expect(question).not.toHaveProperty('choices');
       } else {
         expect(question).not.toHaveProperty('choices');
@@ -408,12 +408,12 @@ describe('generateSession', () => {
       rng: mulberry32(3),
     });
     expect(questions).toHaveLength(12);
-    expect(ids(questions.map((question) => question.event))).not.toContain('approx');
+    expect(ids(questions.map((question) => question.item))).not.toContain('approx');
     for (const question of questions) {
       expect(question.pattern).toBe('yearChoice');
       if (question.pattern === 'yearChoice') {
         expect(question.years).toHaveLength(4);
-        expect(question.years).toContain(question.event.year);
+        expect(question.years).toContain(question.item.year);
       }
     }
   });
@@ -442,7 +442,7 @@ describe('buildQuestion', () => {
 
   it('パターンに合わせて選択肢を作る', () => {
     expect(buildQuestion(target, 'yearInput', events, CURRENT_YEAR, mulberry32(1))).toEqual({
-      event: target,
+      item: target,
       pattern: 'yearInput',
     });
     const yearChoice = buildQuestion(target, 'yearChoice', events, CURRENT_YEAR, mulberry32(1));

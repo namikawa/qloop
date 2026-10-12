@@ -13,7 +13,7 @@ import {
 
 function findByTitle(events: readonly DeckEvent[], title: string | null): DeckEvent {
   const event = events.find((candidate) => candidate.title === title);
-  expect(event, `「${title}」が deck.json に無い`).toBeDefined();
+  expect(event, `「${title}」が decks.json に無い`).toBeDefined();
   return event!;
 }
 
@@ -261,8 +261,8 @@ test('JSON を読み込むと確認の後に記録が置き換わり、形式が
   await expect(notice).toHaveText('読み込めませんでした（JSON として読めません）');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   // 形式が合わないファイル
-  await fileInput.setInputFiles(progressFile({ ...data, schemaVersion: 2 }));
-  await expect(notice).toContainText('schemaVersion が 1 ではありません');
+  await fileInput.setInputFiles(progressFile({ ...data, schemaVersion: 3 }));
+  await expect(notice).toContainText('schemaVersion が 1 か 2 ではありません');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByTestId('overall-attempts')).toHaveText('0 回');
 
@@ -354,7 +354,7 @@ test('書き出しは、ファイル共有が使えなければダウンロー�
     attempts: unknown[];
     sessions: { answered: number }[];
   };
-  expect(saved.schemaVersion).toBe(1);
+  expect(saved.schemaVersion).toBe(2);
   expect(saved.attempts).toHaveLength(1);
   expect(saved.sessions.map((session) => session.answered)).toEqual([1]);
   expect(cspViolations).toEqual([]);

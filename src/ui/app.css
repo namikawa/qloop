@@ -239,6 +239,14 @@ button:disabled {
   line-height: 1.25;
 }
 
+/* 見出しの下の教材の名前（教材が 2 つ以上のときだけ出す） */
+.screen-deck {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-label);
+  line-height: 1.4;
+}
+
 /* 項目名（時代別・記録の管理・間違えた出来事） */
 .section-label {
   margin: var(--space-6) 0 var(--space-2);
@@ -750,6 +758,11 @@ button:disabled {
 .deck {
   margin-top: var(--space-6);
   padding: 18px var(--space-5) var(--space-4);
+}
+
+/* 教材の切り替え（教材が 2 つ以上のときだけ出す） */
+.deck-switch {
+  margin-bottom: var(--space-4);
 }
 
 .deck-name {

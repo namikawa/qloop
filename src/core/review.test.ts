@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DateKeyFn } from './date';
+import { TIMELINE_RULES } from './decks';
 import type { Event, EventStats, Pattern } from './models';
 import { distractorCandidates, population } from './quiz';
 import { mulberry32, type Rng } from './random';
@@ -161,12 +162,13 @@ describe('reviewCandidates', () => {
 
   const run = (stats: EventStats[], events = deck.events) =>
     reviewCandidates({
-      population: population({ events }),
-      allEvents: events,
+      population: population(events),
+      allItems: events,
       stats,
       now: NOW,
       dateKey: JST,
-    }).map(({ event, pattern, weight }) => [event.id, pattern, weight]);
+      rules: TIMELINE_RULES,
+    }).map(({ item, pattern, weight }) => [item.id, pattern, weight]);
 
   it('条件を満たす（出来事, パターン）の組を、重みと一緒に返す', () => {
     expect(
@@ -296,21 +298,22 @@ describe('weightedSample', () => {
 describe('generateReviewSession', () => {
   const events = spread(30);
   const PATTERN_CYCLE: readonly Pattern[] = ['yearInput', 'yearChoice', 'choice'];
-  const candidatesOf = (count: number): ReviewCandidate[] =>
+  const candidatesOf = (count: number): ReviewCandidate<Event>[] =>
     events.slice(0, count).map((event, i) => ({
-      event,
+      item: event,
       pattern: PATTERN_CYCLE[i % 3],
       weight: (i % 3) + 1,
     }));
-  const summarize = (candidates: ReviewCandidate[], seed: number, count: 10 | 20 | 'all') =>
+  const summarize = (candidates: ReviewCandidate<Event>[], seed: number, count: 10 | 20 | 'all') =>
     generateReviewSession({
       candidates,
-      allEvents: events,
+      allItems: events,
       count,
       currentYear: CURRENT_YEAR,
       rng: mulberry32(seed),
+      rules: TIMELINE_RULES,
     }).map((question) => ({
-      id: question.event.id,
+      id: question.item.id,
       pattern: question.pattern,
       choices: question.pattern === 'choice' ? question.choices.map((c) => c.id) : null,
       years: question.pattern === 'yearChoice' ? question.years : null,
@@ -326,7 +329,7 @@ describe('generateReviewSession', () => {
       summarize(few, 1, 10)
         .map((q) => q.id)
         .sort(),
-    ).toEqual(few.map((c) => c.event.id).sort());
+    ).toEqual(few.map((c) => c.item.id).sort());
   });
 
   it('固定シードなら問題列・パターン・選択肢が同じになる', () => {
@@ -340,24 +343,25 @@ describe('generateReviewSession', () => {
     const candidates = candidatesOf(20);
     const questions = generateReviewSession({
       candidates,
-      allEvents: events,
+      allItems: events,
       count: 'all',
       currentYear: CURRENT_YEAR,
       rng: mulberry32(5),
+      rules: TIMELINE_RULES,
     });
     expect(new Set(questions.map((q) => q.pattern))).toEqual(new Set(PATTERN_CYCLE));
     for (const question of questions) {
-      const candidate = candidates.find((c) => c.event === question.event);
+      const candidate = candidates.find((c) => c.item === question.item);
       expect(question.pattern).toBe(candidate?.pattern);
       if (question.pattern === 'choice') {
         expect(question.choices).toHaveLength(4);
-        expect(question.choices).toContain(question.event);
-        const allowed = distractorCandidates(question.event, events);
+        expect(question.choices).toContain(question.item);
+        const allowed = distractorCandidates(question.item, events);
         expect(
-          question.choices.filter((c) => c !== question.event).every((c) => allowed.includes(c)),
+          question.choices.filter((c) => c !== question.item).every((c) => allowed.includes(c)),
         ).toBe(true);
       } else if (question.pattern === 'yearChoice') {
-        const { year } = question.event;
+        const { year } = question.item;
         expect(question.years).toHaveLength(4);
         expect(question.years).toContain(year);
         expect(question.years).toEqual([...question.years].sort((a, b) => a - b));
@@ -373,11 +377,12 @@ describe('generateReviewSession', () => {
     const recent = ev('recent', 2020);
     for (const seed of SEEDS) {
       const [question] = generateReviewSession({
-        candidates: [{ event: recent, pattern: 'yearChoice', weight: 1 }],
-        allEvents: [recent],
+        candidates: [{ item: recent, pattern: 'yearChoice', weight: 1 }],
+        allItems: [recent],
         count: 10,
         currentYear: 2021,
         rng: mulberry32(seed),
+        rules: TIMELINE_RULES,
       });
       expect(question.pattern === 'yearChoice' && question.years.every((y) => y <= 2021)).toBe(
         true,
@@ -387,20 +392,21 @@ describe('generateReviewSession', () => {
 
   it('同じ出来事が 3 つのパターンで候補なら、パターンごとに 1 問ずつ 3 問出る', () => {
     const target = events[0];
-    const candidates: ReviewCandidate[] = PATTERN_CYCLE.map((pattern) => ({
-      event: target,
+    const candidates: ReviewCandidate<Event>[] = PATTERN_CYCLE.map((pattern) => ({
+      item: target,
       pattern,
       weight: 3,
     }));
     for (const seed of SEEDS) {
       const questions = generateReviewSession({
         candidates,
-        allEvents: events,
+        allItems: events,
         count: 10,
         currentYear: CURRENT_YEAR,
         rng: mulberry32(seed),
+        rules: TIMELINE_RULES,
       });
-      expect(questions.map((q) => [q.event.id, q.pattern]).sort()).toEqual([
+      expect(questions.map((q) => [q.item.id, q.pattern]).sort()).toEqual([
         [target.id, 'choice'],
         [target.id, 'yearChoice'],
         [target.id, 'yearInput'],
@@ -412,10 +418,11 @@ describe('generateReviewSession', () => {
     expect(
       generateReviewSession({
         candidates: [],
-        allEvents: events,
+        allItems: events,
         count: 10,
         currentYear: CURRENT_YEAR,
         rng: mulberry32(1),
+        rules: TIMELINE_RULES,
       }),
     ).toEqual([]);
   });

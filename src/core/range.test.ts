@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Era, Event } from './models';
-import { filterByRange, parseRangeYear, validateRange } from './range';
+import { filterByRange, formatRange, parseRangeYear, validateRange } from './range';
 
 function ev(id: string, year: number, era: Era, extra: Partial<Event> = {}): Event {
   return {
@@ -121,5 +121,16 @@ describe('parseRangeYear', () => {
     expect(parseRangeYear('-350')).toBeUndefined();
     expect(parseRangeYear('1.5')).toBeUndefined();
     expect(parseRangeYear('abc')).toBeUndefined();
+  });
+});
+
+describe('formatRange', () => {
+  it('範囲を表示用の文字列にする', () => {
+    expect(formatRange({ kind: 'all' })).toBe('全範囲');
+    expect(formatRange({ kind: 'years', from: 700, to: 1600 })).toBe('700年〜1600年');
+    expect(formatRange({ kind: 'years', from: 700, to: null })).toBe('700年〜');
+    expect(formatRange({ kind: 'years', from: null, to: 1600 })).toBe('〜1600年');
+    expect(formatRange({ kind: 'years', from: null, to: null })).toBe('全範囲');
+    expect(formatRange({ kind: 'eras', eras: ['奈良', '江戸'] })).toBe('奈良・江戸');
   });
 });
