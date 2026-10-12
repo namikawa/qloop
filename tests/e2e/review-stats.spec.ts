@@ -103,7 +103,7 @@ test('年号入力で不正解を作ると復習に候補が出て、復習を�
   await expect(page.getByTestId('result-score')).toHaveText('1 / 1');
   await expect(page.getByTestId('result-total')).toHaveText('予定の問題数 1 問');
 
-  // 正解した後も、直近 14 日以内に不正解があるので候補に残る
+  // 正解がまだ 1 回なので候補に残る
   await page.getByRole('button', { name: 'ホームへ' }).click();
   await openReview(page);
   await expect(page.getByTestId('review-count')).toHaveText('1 件');
@@ -116,6 +116,50 @@ test('年号入力で不正解を作ると復習に候補が出て、復習を�
   await expect(page.getByTestId('history-item')).toHaveCount(2);
   await expect(page.getByTestId('history-item').first()).toContainText('復習');
   await expect(page.getByTestId('history-item').first()).toContainText('1 / 1');
+});
+
+test.describe('復習から外す日付の条件', () => {
+  test.use({ timezoneId: 'Asia/Tokyo' });
+
+  test('間違えた日のうちは 2 回正解しても残り、翌日に正解するとホームの札と復習の候補が消える', async ({
+    page,
+  }) => {
+    // Date だけを固定し、画面のタイマーは動かしたままにする
+    await page.clock.setFixedTime(new Date('2026-10-13T00:00:00.000Z'));
+    const [wrong] = await answerYearInputs(page, [false]);
+    await expect(page.getByTestId('home-review-count')).toHaveText('1 件');
+
+    const answerReview = async () => {
+      await openReview(page);
+      await expect(page.getByTestId('review-count')).toHaveText('1 件');
+      await page.getByRole('button', { name: '開始' }).click();
+      await expect(page.getByTestId('progress')).toHaveText('1 / 1');
+      const event = findByTitle(
+        readDeckEvents(),
+        await page.locator('.question-text').textContent(),
+      );
+      expect(event.id).toBe(wrong.id);
+      await page.getByRole('textbox', { name: '年号' }).fill(String(event.year));
+      await page.getByRole('button', { name: '回答' }).click();
+      await expect(page.getByTestId('judgement')).toHaveText('正解');
+      await page.getByRole('button', { name: '結果を見る' }).click();
+      await page.getByRole('button', { name: 'ホームへ' }).click();
+    };
+
+    await page.clock.setFixedTime(new Date('2026-10-13T01:00:00.000Z'));
+    await answerReview();
+    await expect(page.getByTestId('home-review-count')).toHaveText('1 件');
+    await page.clock.setFixedTime(new Date('2026-10-13T02:00:00.000Z'));
+    await answerReview();
+    await expect(page.getByTestId('home-review-count')).toHaveText('1 件');
+
+    await page.clock.setFixedTime(new Date('2026-10-14T00:00:00.000Z'));
+    await answerReview();
+    await expect(page.getByTestId('home-review-count')).toHaveCount(0);
+    await openReview(page);
+    await expect(page.getByTestId('review-count')).toHaveText('復習する問題はありません');
+    await expect(page.getByRole('button', { name: '開始' })).toBeDisabled();
+  });
 });
 
 test('成績画面は 全体・出来事別・履歴 を切り替えて出し、出来事別の並べ替えと内訳の開閉が動く', async ({

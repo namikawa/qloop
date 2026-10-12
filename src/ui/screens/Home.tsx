@@ -168,9 +168,30 @@ export function Home({
       )}
 
       <main className="home">
-        <h1 className="home-logo">
-          <img src="/qloop-logo.svg" alt="QLoop" width={112} height={36} />
-        </h1>
+        <div className="home-heading">
+          <h1 className="home-logo">
+            <img src="/qloop-logo.svg" alt="QLoop" width={112} height={36} />
+          </h1>
+          {ready && streakDays !== null && (
+            <p className="streak" data-testid="home-streak">
+              連続学習日数 <span className="streak-number">{streakDays}</span>{' '}
+              <span className="streak-unit">日</span>
+            </p>
+          )}
+        </div>
+
+        {storeStatus.status === 'loading' && (
+          <p className="status-text" role="status">
+            学習の記録を読み込んでいます…
+          </p>
+        )}
+        {storeStatus.status === 'error' && (
+          <div className="error-box" role="alert">
+            <p className="error-box-title">学習の記録を開けないため、学習を始められません</p>
+            <p className="error-box-detail">理由: {storeStatus.message}</p>
+          </div>
+        )}
+
         <section className="card deck" aria-labelledby="deck-name">
           {decks !== null && (
             <div className="deck-switch">
@@ -198,60 +219,41 @@ export function Home({
               （{labels.core} {coreCount} 件）
             </span>
           </p>
-          {ready && streakDays !== null && (
-            <p className="streak" data-testid="home-streak">
-              連続学習日数 <span className="streak-number">{streakDays}</span>{' '}
-              <span className="streak-unit">日</span>
-            </p>
-          )}
-        </section>
-
-        {storeStatus.status === 'loading' && (
-          <p className="status-text" role="status">
-            学習の記録を読み込んでいます…
-          </p>
-        )}
-        {storeStatus.status === 'error' && (
-          <div className="error-box" role="alert">
-            <p className="error-box-title">学習の記録を開けないため、学習を始められません</p>
-            <p className="error-box-detail">理由: {storeStatus.message}</p>
-          </div>
-        )}
-
-        <button
-          type="button"
-          className="button-primary home-start"
-          disabled={!ready}
-          onClick={onStartQuiz}
-        >
-          出題
-        </button>
-        <div className="card card-flat menu">
           <button
             type="button"
-            className="menu-row"
+            className="button-primary home-start"
             disabled={!ready}
-            aria-labelledby={reviewLabelId}
-            aria-describedby={showReviewBadge ? reviewBadgeId : undefined}
-            onClick={onStartReview}
+            onClick={onStartQuiz}
           >
-            <ReviewIcon className="menu-icon" />
-            <span id={reviewLabelId} className="menu-label">
-              復習
-            </span>
-            {showReviewBadge && (
-              <span id={reviewBadgeId} className="menu-badge" data-testid="home-review-count">
-                {reviewCount} 件
+            出題
+          </button>
+          <div className="deck-menu">
+            <button
+              type="button"
+              className="menu-row"
+              disabled={!ready}
+              aria-labelledby={reviewLabelId}
+              aria-describedby={showReviewBadge ? reviewBadgeId : undefined}
+              onClick={onStartReview}
+            >
+              <ReviewIcon className="menu-icon" />
+              <span id={reviewLabelId} className="menu-label">
+                復習
               </span>
-            )}
-            <ChevronRightIcon className="menu-chevron" />
-          </button>
-          <button type="button" className="menu-row" disabled={!ready} onClick={onOpenStats}>
-            <StatsIcon className="menu-icon" />
-            <span className="menu-label">成績</span>
-            <ChevronRightIcon className="menu-chevron" />
-          </button>
-        </div>
+              {showReviewBadge && (
+                <span id={reviewBadgeId} className="menu-badge" data-testid="home-review-count">
+                  {reviewCount} 件
+                </span>
+              )}
+              <ChevronRightIcon className="menu-chevron" />
+            </button>
+            <button type="button" className="menu-row" disabled={!ready} onClick={onOpenStats}>
+              <StatsIcon className="menu-icon" />
+              <span className="menu-label">成績</span>
+              <ChevronRightIcon className="menu-chevron" />
+            </button>
+          </div>
+        </section>
       </main>
 
       <VersionFooter version={version} onCheckUpdate={onCheckUpdate} />

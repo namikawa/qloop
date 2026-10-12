@@ -71,6 +71,7 @@ function stats(item: Word, pattern: VocabularyPattern): EventStats {
     lastCorrect: false,
     lastAnsweredAt: '2026-10-12T01:00:00.000Z',
     lastWrongAt: '2026-10-12T01:00:00.000Z',
+    consecutiveCorrect: 0,
   };
 }
 

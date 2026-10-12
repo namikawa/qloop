@@ -1,10 +1,10 @@
 import 'fake-indexeddb/auto';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deckModel } from '../core/decks';
 import type { Attempt, Era, Event, Pattern, Session, Settings } from '../core/models';
-import { generateReviewSession, reviewCandidates } from '../core/review';
+import { generateReviewSession, needsReview, reviewCandidates } from '../core/review';
 import { summarizeStats } from '../core/stats';
-import { openDb, type QLoopDb, type StoredSession } from './db';
+import { openDb, type QLoopDb, type StoredEventStats, type StoredSession } from './db';
 import { ProgressStore, type StartSessionInput } from './progress-store';
 import { ImportFormatError, parseProgressExport, type ProgressExport } from './transfer';
 
@@ -24,6 +24,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const db of openedDbs) {
     db.close();
   }
@@ -98,6 +99,63 @@ describe('ProgressStore.startSession', () => {
 });
 
 describe('ProgressStore.recordAnswer', () => {
+  it('連続正解数は項目 × パターンごとに数え、通常と復習を通算し、不正解（わからないを含む）で 0 に戻す', async () => {
+    const { store, db } = await createStore();
+    const normal = await store.startSession({ ...NORMAL, deckId: 'japanese-vocabulary' });
+    await answer(store, normal.id, 'jv-0001', 'meaningChoice', false);
+    expect(store.getEventStats('jv-0001', 'meaningChoice')?.consecutiveCorrect).toBe(0);
+    await answer(store, normal.id, 'jv-0001', 'meaningChoice', true);
+    expect(store.getEventStats('jv-0001', 'meaningChoice')?.consecutiveCorrect).toBe(1);
+    await answer(store, normal.id, 'jv-0001', 'wordChoice', true);
+    await answer(store, normal.id, 'jv-0002', 'meaningChoice', true, true);
+    expect(store.getEventStats('jv-0001', 'meaningChoice')?.consecutiveCorrect).toBe(1);
+
+    const review = await store.startSession({
+      deckId: 'japanese-vocabulary',
+      mode: 'review',
+      pattern: null,
+      range: null,
+      total: 3,
+    });
+    await answer(store, review.id, 'jv-0001', 'meaningChoice', true);
+    expect(store.getEventStats('jv-0001', 'meaningChoice')?.consecutiveCorrect).toBe(2);
+    // 「わからない」も correct: false として保存する
+    await answer(store, review.id, 'jv-0001', 'meaningChoice', false);
+    expect(store.getEventStats('jv-0001', 'meaningChoice')?.consecutiveCorrect).toBe(0);
+    await answer(store, review.id, 'jv-0001', 'meaningChoice', true, true);
+    expect(store.getEventStats('jv-0001', 'meaningChoice')?.consecutiveCorrect).toBe(1);
+    expect(store.getEventStats('jv-0001', 'wordChoice')?.consecutiveCorrect).toBe(1);
+    expect(store.getEventStats('jv-0002', 'meaningChoice')?.consecutiveCorrect).toBe(1);
+    expect(byKey(await db.getAll('eventStats'))).toEqual(byKey(store.listEventStats()));
+  });
+
+  it('復習から外れた組もまた間違えると連続正解数が 0 に戻り、候補に戻る', async () => {
+    const { store } = await createStore();
+    const session = await store.startSession(NORMAL);
+    await answer(store, session.id, 'jh-0001', 'yearInput', false);
+    advance(DAY);
+    await answer(store, session.id, 'jh-0001', 'yearInput', true);
+    await answer(store, session.id, 'jh-0001', 'yearInput', true);
+    const dateKey = (date: Date) => date.toISOString().slice(0, 10);
+    expect(needsReview(store.getEventStats('jh-0001', 'yearInput')!, current, dateKey)).toBe(false);
+    await answer(store, session.id, 'jh-0001', 'yearInput', false);
+    expect(store.getEventStats('jh-0001', 'yearInput')?.consecutiveCorrect).toBe(0);
+    expect(needsReview(store.getEventStats('jh-0001', 'yearInput')!, current, dateKey)).toBe(true);
+  });
+
+  it('直前の集計に連続正解数が無ければ 0 とみなして加算する', async () => {
+    const { store, db } = await createStore();
+    const session = await store.startSession(NORMAL);
+    await answer(store, session.id, 'jh-0001', 'yearInput', true);
+    await answer(store, session.id, 'jh-0001', 'yearInput', true);
+    const legacy: StoredEventStats = { ...store.getEventStats('jh-0001', 'yearInput')! };
+    delete legacy.consecutiveCorrect;
+    await db.put('eventStats', legacy);
+    await answer(store, session.id, 'jh-0001', 'yearInput', true);
+    expect(store.getEventStats('jh-0001', 'yearInput')?.consecutiveCorrect).toBe(1);
+    expect((await db.get('eventStats', ['jh-0001', 'yearInput']))?.consecutiveCorrect).toBe(1);
+  });
+
   it('1 回の呼び出しで attempts・eventStats・sessions・meta を更新する', async () => {
     const { store, db } = await createStore();
     const session = await store.startSession(NORMAL);
@@ -129,6 +187,7 @@ describe('ProgressStore.recordAnswer', () => {
       lastAnsweredAt: answeredAt,
       lastCorrect: false,
       lastWrongAt: answeredAt,
+      consecutiveCorrect: 0,
     });
     expect(await db.get('sessions', session.id)).toMatchObject({
       answered: 1,
@@ -182,6 +241,7 @@ describe('ProgressStore.recordAnswer', () => {
       lastAnsweredAt: '2026-10-11T04:00:00.000Z',
       lastCorrect: true,
       lastWrongAt: '2026-10-11T03:00:00.000Z',
+      consecutiveCorrect: 1,
     };
     expect(await db.get('eventStats', ['demo-0007', 'yearInput'])).toEqual(yearInput);
     expect(store.getEventStats('demo-0007', 'yearInput')).toEqual(yearInput);
@@ -194,6 +254,7 @@ describe('ProgressStore.recordAnswer', () => {
       lastAnsweredAt: '2026-10-11T05:00:00.000Z',
       lastCorrect: true,
       lastWrongAt: null,
+      consecutiveCorrect: 1,
     };
     expect(await db.get('eventStats', ['demo-0007', 'choice'])).toEqual(choice);
     expect(store.getEventStats('demo-0007', 'choice')).toEqual(choice);
@@ -379,6 +440,64 @@ describe('別の画面の起動で回答前のセッションが削除された�
 });
 
 describe('ProgressStore.load', () => {
+  it('連続正解数の無い集計が 1 件でもあれば attempts から数え直し、保存して次の load では数え直さない', async () => {
+    const first = await createStore();
+    const { second } = await seed(first.store);
+    await answer(first.store, second.id, 'jh-0001', 'yearInput', true, true);
+    const expected = byKey(first.store.listEventStats());
+    const legacy: StoredEventStats = { ...first.store.getEventStats('jh-0001', 'yearInput')! };
+    delete legacy.consecutiveCorrect;
+    await first.db.put('eventStats', legacy);
+    const store = new ProgressStore({
+      db: first.db,
+      dateKey: (date) => date.toISOString().slice(0, 10),
+    });
+    const rebuild = vi.spyOn(store, 'rebuild');
+
+    await store.load();
+    expect(rebuild).toHaveBeenCalledTimes(1);
+    expect(store.getEventStats('jh-0001', 'yearInput')?.consecutiveCorrect).toBe(2);
+    expect(byKey(store.listEventStats())).toEqual(expected);
+    expect(byKey(await first.db.getAll('eventStats'))).toEqual(expected);
+
+    await store.load();
+    expect(rebuild).toHaveBeenCalledTimes(1);
+    expect(byKey(store.listEventStats())).toEqual(expected);
+    const reloaded = await createStore(first.db);
+    expect(byKey(reloaded.store.listEventStats())).toEqual(expected);
+  });
+
+  it('数え直しに失敗しても load は成功し、メモリだけで無い値を 0 とみなし、次の起動で再試行する', async () => {
+    const first = await createStore();
+    await seed(first.store);
+    const legacy: StoredEventStats = { ...first.store.getEventStats('jh-0001', 'yearInput')! };
+    delete legacy.consecutiveCorrect;
+    await first.db.put('eventStats', legacy);
+    const before = await first.db.getAll('eventStats');
+    const store = new ProgressStore({
+      db: first.db,
+      dateKey: () => {
+        throw new Error('暦の計算に失敗');
+      },
+    });
+
+    await expect(store.load()).resolves.toBeUndefined();
+    expect(store.getEventStats('jh-0001', 'yearInput')).toEqual({
+      ...legacy,
+      consecutiveCorrect: 0,
+    });
+    expect(store.getEventStats('jh-0001', 'choice')?.consecutiveCorrect).toBe(1);
+    expect(store.listSessions()).toEqual(first.store.listSessions());
+    expect(store.getStudyDays()).toEqual(first.store.getStudyDays());
+    expect(await first.db.getAll('eventStats')).toEqual(before);
+
+    const retried = await createStore(first.db);
+    expect(retried.store.getEventStats('jh-0001', 'yearInput')?.consecutiveCorrect).toBe(1);
+    expect((await first.db.get('eventStats', ['jh-0001', 'yearInput']))?.consecutiveCorrect).toBe(
+      1,
+    );
+  });
+
   it('未終了で回答が 0 件のセッションを削除し、中断（回答あり）と終了済みは残す', async () => {
     const first = await createStore();
     const empty = await first.store.startSession(NORMAL);
@@ -564,6 +683,27 @@ const byId = <T extends { id: string }>(sessions: T[]) =>
   [...sessions].sort((a, b) => a.id.localeCompare(b.id));
 
 describe('ProgressStore.rebuild', () => {
+  it('連続正解数は時刻順でなく attempts の記録した順に数え、パターンごとに不正解で 0 に戻す', async () => {
+    const { store, db } = await createStore();
+    const session = await store.startSession(NORMAL);
+    for (const [index, correct] of [true, true, false, true, true, true].entries()) {
+      // 時計が戻っても自動採番の順で数える
+      current = new Date(`2026-10-${20 - index}T01:00:00.000Z`);
+      await answer(store, session.id, 'jh-0001', 'yearInput', correct);
+    }
+    await answer(store, session.id, 'jh-0001', 'choice', true);
+    await answer(store, session.id, 'jh-0001', 'choice', false, true);
+    await db.clear('eventStats');
+    await store.rebuild();
+    expect(store.getEventStats('jh-0001', 'yearInput')).toMatchObject({
+      consecutiveCorrect: 3,
+      lastAnsweredAt: '2026-10-15T01:00:00.000Z',
+      lastWrongAt: '2026-10-18T01:00:00.000Z',
+    });
+    expect(store.getEventStats('jh-0001', 'choice')?.consecutiveCorrect).toBe(0);
+    expect(byKey(await db.getAll('eventStats'))).toEqual(byKey(store.listEventStats()));
+  });
+
   it('attempts から eventStats・sessions の件数・studyDays を復元する（他の項目と設定はそのまま）', async () => {
     const { store, db } = await createStore();
     await seed(store);
@@ -621,6 +761,7 @@ describe('ProgressStore.rebuild', () => {
       lastAnsweredAt: '2026-10-11T03:00:00.000Z',
       lastCorrect: true,
       lastWrongAt: '2026-10-11T02:00:00.000Z',
+      consecutiveCorrect: 1,
     });
     expect(store.getSession(empty.id)).toMatchObject({ answered: 0, correct: 0 });
     expect((await db.get('sessions', empty.id))?.answered).toBe(0);
@@ -658,6 +799,33 @@ describe('ProgressStore.rebuild', () => {
 });
 
 describe('ProgressStore.exportData と importData', () => {
+  it.each([1, 2])(
+    '版 %i の書き出しファイルを復元すると、連続正解数も組ごとに作り直す',
+    async (version) => {
+      const source = await createStore();
+      const { second } = await seed(source.store);
+      await answer(source.store, second.id, 'jh-0001', 'yearInput', true, true);
+      const data = await source.store.exportData();
+      const sessions =
+        version === 1
+          ? data.sessions.map((session) => {
+              const legacy: StoredSession = { ...session };
+              delete legacy.deckId;
+              return legacy;
+            })
+          : data.sessions;
+      dbName = `${dbName}-target`;
+      const target = await createStore();
+      await target.store.importData({ ...data, schemaVersion: version, sessions });
+      expect(target.store.getEventStats('jh-0001', 'yearInput')?.consecutiveCorrect).toBe(2);
+      expect(target.store.getEventStats('jh-0002', 'yearInput')?.consecutiveCorrect).toBe(0);
+      expect(byKey(target.store.listEventStats())).toEqual(byKey(source.store.listEventStats()));
+      expect(byKey(await target.db.getAll('eventStats'))).toEqual(
+        byKey(source.store.listEventStats()),
+      );
+    },
+  );
+
   it('書き出しは schemaVersion・書き出した時刻・attempts の全件・sessions を返す', async () => {
     const { store, db } = await createStore();
     const { first, second } = await seed(store);
@@ -797,6 +965,7 @@ describe('ProgressStore.exportData と importData', () => {
         lastAnsweredAt: '2026-10-01T00:00:02.000Z',
         lastCorrect: true,
         lastWrongAt: '2026-10-01T00:00:01.000Z',
+        consecutiveCorrect: 1,
       },
     ]);
     expect(await db.get('meta', 'settings')).toBeUndefined();

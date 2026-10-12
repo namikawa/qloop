@@ -43,6 +43,10 @@ type MetaRecord =
 /** 保存されたセッション。1.0 の記録には `deckId` が無い（読むときに `LEGACY_DECK_ID` を補う）。 */
 export type StoredSession = Omit<Session, 'deckId'> & Partial<Pick<Session, 'deckId'>>;
 
+/** 保存された集計。1.1.1 より前の記録には `consecutiveCorrect` が無い（設計書 5.4 節）。 */
+export type StoredEventStats = Omit<EventStats, 'consecutiveCorrect'> &
+  Partial<Pick<EventStats, 'consecutiveCorrect'>>;
+
 export interface QLoopSchema extends DBSchema {
   /** 回答の記録。追記のみで、成績の正本。 */
   attempts: {
@@ -53,7 +57,7 @@ export interface QLoopSchema extends DBSchema {
   /** 項目 × パターンの集計。`attempts` から再計算できる派生データ。 */
   eventStats: {
     key: [string, Pattern];
-    value: EventStats;
+    value: StoredEventStats;
   };
   sessions: {
     key: string;

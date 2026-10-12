@@ -1,12 +1,59 @@
 import { readFileSync } from 'node:fs';
 import { devices, expect, test } from '@playwright/test';
-import { collectCspViolations } from './helpers';
+import { collectCspViolations, expectNoHorizontalScroll, radio } from './helpers';
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8')) as T;
 }
 
 const INSTALL_MESSAGE = 'Safari の共有メニューから『ホーム画面に追加』して使ってください';
+
+for (const width of [375, 402]) {
+  test.describe(`ホームの教材のカード（幅 ${width}px）`, () => {
+    test.use({ viewport: { width, height: 667 } });
+
+    test('両教材で切り替えから成績までがカードに入り、連続学習日数はロゴの右にあり、1 画面に収まる', async ({
+      page,
+    }) => {
+      await page.addInitScript(() => {
+        Object.defineProperty(Navigator.prototype, 'standalone', { get: () => true });
+      });
+      await page.goto('/');
+      await expect(page.locator('.banner')).toHaveCount(0);
+      const deck = page.locator('section.deck');
+      const streak = page.getByTestId('home-streak');
+      await expect(streak).toBeVisible();
+      for (const name of ['日本史年表', '語彙']) {
+        await radio(page, name).check();
+        await expect(deck.getByRole('group', { name: '教材', exact: true })).toBeVisible();
+        await expect(deck.getByRole('radio')).toHaveCount(2);
+        await expect(deck.getByRole('heading', { level: 2, name, exact: true })).toBeVisible();
+        await expect(deck.getByTestId('target-count')).toContainText(
+          name === '語彙' ? '言葉' : '出来事',
+        );
+        for (const action of ['出題', '復習', '成績']) {
+          await expect(deck.getByRole('button', { name: action, exact: true })).toBeEnabled();
+        }
+        await expect(deck.getByTestId('home-streak')).toHaveCount(0);
+        expect(await streak.evaluate((element) => element.closest('section.deck'))).toBeNull();
+        await expect(page.locator('.home-heading').getByTestId('home-streak')).toBeVisible();
+        const logoBox = await page.locator('.home-logo').boundingBox();
+        const streakBox = await streak.boundingBox();
+        expect(logoBox).not.toBeNull();
+        expect(streakBox).not.toBeNull();
+        expect(streakBox!.x).toBeGreaterThanOrEqual(logoBox!.x + logoBox!.width);
+        expect(
+          Math.abs(streakBox!.y + streakBox!.height / 2 - logoBox!.y - logoBox!.height / 2),
+        ).toBeLessThanOrEqual(1);
+        await expectNoHorizontalScroll(page);
+        const deckBox = await deck.boundingBox();
+        expect(deckBox).not.toBeNull();
+        expect(deckBox!.y + deckBox!.height).toBeLessThanOrEqual(667);
+        expect(await page.evaluate(() => window.scrollY)).toBe(0);
+      }
+    });
+  });
+}
 
 test('ホーム画面に教材名・件数・版が表示され、横スクロールしない', async ({ page }) => {
   const cspViolations = collectCspViolations(page);

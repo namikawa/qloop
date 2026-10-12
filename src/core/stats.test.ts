@@ -57,6 +57,7 @@ function st(
     lastAnsweredAt,
     lastCorrect: true,
     lastWrongAt: null,
+    consecutiveCorrect: correct,
   };
 }
 

@@ -70,7 +70,8 @@ function statsKey(eventId: string, pattern: Pattern): string {
 /**
  * 成績の状態を持つ唯一のオブジェクト（設計書 5.4 節）。全教材の記録をまとめて持つ。
  * IndexedDB への保存と、メモリ上の集計（`eventStats`・`sessions`・`meta`）の更新を同じ内容で行う。
- * 起動時の `load()` では `attempts` の全件は読まない。書き込みに失敗したら例外を投げ、メモリ上の状態は変えない。
+ * 起動時の `load()` では、1.1.1 より前の集計の数え直しを除き `attempts` の全件は読まない。
+ * 回答の書き込みに失敗したら例外を投げ、メモリ上の状態は変えない。
  *
  * `attempts`・`eventStats` に教材の id は持たない（教材ごとの成績と復習は、教材の母集団で絞る）。教材を持つのは
  * セッションの `deckId` と、`meta` の教材ごとの出題設定（`settings:<教材の id>`）・`lastDeck` だけ。
@@ -108,6 +109,8 @@ export class ProgressStore {
    * `eventStats`・`sessions`・`meta`（出題設定・最後に選んだ教材・学習日）を読んでメモリに持つ。
    * 同じトランザクションで、`endedAt` が `null` で回答が 0 件のセッションを削除する（設計書 6.4 節の 7）。
    * 回答が 1 件以上ある未終了のセッションは中断として残す。`deckId` の無いセッションには `LEGACY_DECK_ID` を補う。
+   * `consecutiveCorrect` の無い集計があれば、`attempts` から数え直す（設計書 5.4 節）。
+   * 数え直しに失敗したらメモリ上だけ 0 とみなし、次の起動でまた数え直す。
    */
   async load(): Promise<void> {
     const tx = this.db.transaction(['eventStats', 'sessions', 'meta'], 'readwrite');
@@ -149,7 +152,21 @@ export class ProgressStore {
         );
       }
     }
-    this.applyState({ stats, sessions, studyDays });
+    this.applyState({
+      stats: stats.map((record) => ({
+        ...record,
+        consecutiveCorrect: record.consecutiveCorrect ?? 0,
+      })),
+      sessions,
+      studyDays,
+    });
+    if (stats.some((record) => record.consecutiveCorrect === undefined)) {
+      try {
+        await this.rebuild();
+      } catch {
+        // 起動は続け、保存された集計に無い値は次の起動で再び数え直す
+      }
+    }
   }
 
   /** セッションを始める（設計書 6.4 節の 2）。`sessions` にレコードを作り、そのセッションを返す。 */
@@ -217,6 +234,7 @@ export class ProgressStore {
         lastAnsweredAt: answeredAt,
         lastCorrect: input.correct,
         lastWrongAt: input.correct ? (previous?.lastWrongAt ?? null) : answeredAt,
+        consecutiveCorrect: input.correct ? (previous?.consecutiveCorrect ?? 0) + 1 : 0,
       };
       const nextSession: Session = {
         ...session,
@@ -499,6 +517,7 @@ function deriveProgress(
       lastAnsweredAt: attempt.answeredAt,
       lastCorrect: attempt.correct,
       lastWrongAt: attempt.correct ? (previous?.lastWrongAt ?? null) : attempt.answeredAt,
+      consecutiveCorrect: attempt.correct ? (previous?.consecutiveCorrect ?? 0) + 1 : 0,
     });
     const count = counts.get(attempt.sessionId) ?? { answered: 0, correct: 0 };
     counts.set(attempt.sessionId, {

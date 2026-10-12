@@ -51,6 +51,7 @@ function st(eventId: string, pattern: Pattern, extra: Partial<EventStats> = {}):
     lastAnsweredAt: jst('2026-10-20'),
     lastCorrect: true,
     lastWrongAt: null,
+    consecutiveCorrect: 0,
     ...extra,
   };
 }
@@ -112,11 +113,102 @@ describe('needsReview', () => {
     ).toBe(false);
   });
 
-  it('どの条件も満たさなければ候補にしない（正解した後も条件を満たす間は候補に残る）', () => {
+  it('どの条件も満たさなければ候補にしない', () => {
     expect(needsReview(st('a', 'yearInput'), NOW, JST)).toBe(false);
     expect(
       needsReview(
         st('a', 'yearInput', { attempts: 2, correct: 1, lastWrongAt: jst('2026-10-24') }),
+        NOW,
+        JST,
+      ),
+    ).toBe(true);
+  });
+
+  it('続けて 2 回正解し、最後の回答が間違えた日の翌日なら、14 日以内の不正解があっても外す', () => {
+    expect(
+      needsReview(
+        st('a', 'yearInput', {
+          attempts: 3,
+          correct: 2,
+          lastWrongAt: jst('2026-10-23'),
+          lastAnsweredAt: jst('2026-10-24'),
+          consecutiveCorrect: 2,
+        }),
+        NOW,
+        JST,
+      ),
+    ).toBe(false);
+  });
+
+  it('正答率が 60% 未満でも、続けて 2 回以上正解し、最後の回答が間違えた日より後なら外す', () => {
+    expect(
+      needsReview(
+        st('a', 'choice', {
+          attempts: 10,
+          correct: 2,
+          lastWrongAt: jst('2026-09-01'),
+          lastAnsweredAt: jst('2026-09-02'),
+          consecutiveCorrect: 2,
+        }),
+        NOW,
+        JST,
+      ),
+    ).toBe(false);
+  });
+
+  it('間違えた日と同じ暦日なら、続けて 2 回以上正解しても翌日以降の候補に残る', () => {
+    expect(
+      needsReview(
+        st('a', 'yearInput', {
+          attempts: 3,
+          correct: 2,
+          lastWrongAt: jst('2026-10-24', '09:00'),
+          lastAnsweredAt: jst('2026-10-24', '23:59'),
+          consecutiveCorrect: 2,
+        }),
+        NOW,
+        JST,
+      ),
+    ).toBe(true);
+  });
+
+  it('間違えた日より後でも、続けて 1 回の正解なら候補に残る', () => {
+    expect(
+      needsReview(
+        st('a', 'yearInput', {
+          attempts: 2,
+          correct: 1,
+          lastWrongAt: jst('2026-10-23'),
+          lastAnsweredAt: jst('2026-10-24'),
+          consecutiveCorrect: 1,
+        }),
+        NOW,
+        JST,
+      ),
+    ).toBe(true);
+  });
+
+  it('外す条件の暦日の後先も注入した暦で判定する（23:59 と翌日の 0:01）', () => {
+    const stats = st('a', 'yearInput', {
+      attempts: 3,
+      correct: 2,
+      lastWrongAt: jst('2026-10-23', '23:59'),
+      lastAnsweredAt: jst('2026-10-24', '00:01'),
+      consecutiveCorrect: 2,
+    });
+    const UTC: DateKeyFn = (date) => date.toISOString().slice(0, 10);
+    expect(needsReview(stats, NOW, JST)).toBe(false);
+    expect(needsReview(stats, NOW, UTC)).toBe(true);
+  });
+
+  it('最後の回答の暦日が間違えた日より前なら、時計が戻っていても外さない', () => {
+    expect(
+      needsReview(
+        st('a', 'yearInput', {
+          lastWrongAt: jst('2026-10-24'),
+          lastAnsweredAt: jst('2026-10-23'),
+          consecutiveCorrect: 2,
+        }),
         NOW,
         JST,
       ),
@@ -206,6 +298,25 @@ describe('reviewCandidates', () => {
         st('f2', 'yearChoice'),
       ]),
     ).toEqual([['f1', 'yearChoice', 2]]);
+  });
+
+  it('外れた組だけを除き、同じ項目のほかのパターンの組は並びと重みを保って残す', () => {
+    expect(
+      run([
+        st('target', 'yearInput', {
+          attempts: 3,
+          correct: 2,
+          lastWrongAt: jst('2026-10-23'),
+          lastAnsweredAt: jst('2026-10-24'),
+          consecutiveCorrect: 2,
+        }),
+        st('target', 'yearChoice', wrong),
+        st('target', 'choice', wrong),
+      ]),
+    ).toEqual([
+      ['target', 'yearChoice', 3],
+      ['target', 'choice', 3],
+    ]);
   });
 
   it('現在のデータに無い eventId と、母集団に入らない高校の出来事の集計は候補にしない', () => {
