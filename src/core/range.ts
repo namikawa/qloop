@@ -1,4 +1,4 @@
-import type { Event, Range } from './models';
+import type { Event, Range, TimelineRange } from './models';
 import { normalizeYearInput } from './year';
 
 /**
@@ -9,7 +9,7 @@ import { normalizeYearInput } from './year';
  *   `from` は正の整数なので、紀元前（負の年）の出来事は `from` が空のときだけ含まれる。
  * - 時代: 出来事の確定した時代（CSV の `era` による上書きを反映したもの）が、選んだ時代のどれかに当たるもの。
  */
-export function filterByRange(events: readonly Event[], range: Range): Event[] {
+export function filterByRange(events: readonly Event[], range: TimelineRange): Event[] {
   switch (range.kind) {
     case 'all':
       return [...events];
@@ -38,6 +38,8 @@ export function formatRange(range: Range): string {
       return `${range.from === null ? '' : `${range.from}年`}〜${range.to === null ? '' : `${range.to}年`}`;
     case 'eras':
       return range.eras.join('・');
+    case 'categories':
+      return range.categories.join('・');
   }
 }
 

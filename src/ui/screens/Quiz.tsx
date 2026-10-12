@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { Event, Question, Session } from '../../core/models';
+import type { Event, Question, Session, VocabularyQuestion } from '../../core/models';
 import { answeredRatio, progressSteps, type AnswerOutcome } from '../../core/progress';
 import { isCorrectYear } from '../../core/quiz';
 import {
@@ -263,6 +263,17 @@ function QuestionBody({ question, judgement, disabled, onAnswer, onGiveUp }: Que
           onGiveUp={onGiveUp}
         />
       );
+    case 'meaningChoice':
+    case 'wordChoice':
+      return (
+        <VocabularyChoiceQuestion
+          question={question}
+          judgement={judgement}
+          disabled={disabled}
+          onAnswer={(id) => onAnswer(id === question.item.id, id)}
+          onGiveUp={onGiveUp}
+        />
+      );
     case 'choice':
       return (
         <ChoiceQuestion
@@ -281,6 +292,11 @@ function QuestionBody({ question, judgement, disabled, onAnswer, onGiveUp }: Que
  * 判定の帯の補足。年号入力と年号 4 択は正解の年（別解を併記）を出す。出来事 4 択は選択肢の強調で正解を示すので出さない。
  */
 function JudgementDetail({ question }: { question: Question }) {
+  if (question.pattern === 'meaningChoice' || question.pattern === 'wordChoice') {
+    return question.item.reading === null ? null : (
+      <p className="judgement-detail">読み {question.item.reading}</p>
+    );
+  }
   if (question.pattern === 'choice') {
     return null;
   }
@@ -510,6 +526,59 @@ function ChoiceQuestion({
                 onClick={() => onAnswer(choice)}
               >
                 <span className="choice-title">{choice.title}</span>
+                {badge !== null && <span className="choice-badge">{badge}</span>}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {judgement === null && <GiveUpButton disabled={disabled} onClick={onGiveUp} />}
+    </div>
+  );
+}
+
+function VocabularyChoiceQuestion({
+  question,
+  judgement,
+  disabled,
+  onAnswer,
+  onGiveUp,
+}: {
+  question: VocabularyQuestion;
+  judgement: Judgement | null;
+  disabled: boolean;
+  onAnswer: (id: string) => void;
+  onGiveUp: () => void;
+}) {
+  const meaningChoice = question.pattern === 'meaningChoice';
+  return (
+    <div className="question vocabulary-question">
+      <div className="card question-card">
+        <p className="question-prompt">
+          {meaningChoice ? 'どんな意味？' : `この意味の${question.item.category}は？`}
+        </p>
+        <p className={meaningChoice ? 'question-text vocabulary-word' : 'question-text'}>
+          {meaningChoice ? question.item.word : question.item.meaning}
+        </p>
+      </div>
+      <ul className="choices">
+        {question.choices.map((choice) => {
+          const { className, badge } = settledChoice(
+            judgement,
+            choice.id === question.item.id,
+            choice.id === judgement?.chosen,
+            'choice',
+          );
+          return (
+            <li key={choice.id}>
+              <button
+                type="button"
+                className={className}
+                data-testid="vocabulary-choice"
+                disabled={judgement !== null || disabled}
+                onClick={() => onAnswer(choice.id)}
+              >
+                <span className="choice-title">{meaningChoice ? choice.meaning : choice.word}</span>
                 {badge !== null && <span className="choice-badge">{badge}</span>}
               </button>
             </li>

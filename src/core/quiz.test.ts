@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { Event, Pattern, PatternMode, Question } from './models';
+import type {
+  Event,
+  TimelinePattern as Pattern,
+  TimelinePatternMode as PatternMode,
+  TimelineQuestion as Question,
+} from './models';
 import {
   buildQuestion,
   distractorCandidates,

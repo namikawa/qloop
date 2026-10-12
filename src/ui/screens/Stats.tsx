@@ -45,6 +45,8 @@ interface StatsProps<I extends Item, P extends Pattern> {
   population: readonly I[];
   /** その教材の種類の差分（まとめる単位・パターンの表示名・項目の表示・画面の言葉）。 */
   rules: KindRules<I, P>;
+  /** 教材が 2 つ以上なら、記録の管理が全教材をまとめて扱うことを示す（設計書 8 章 1 の 3）。 */
+  multipleDecks?: boolean;
   onBack: () => void;
 }
 
@@ -79,6 +81,7 @@ export function Stats<I extends Item, P extends Pattern>({
   deckName,
   population,
   rules,
+  multipleDecks = false,
   onBack,
 }: StatsProps<I, P>) {
   const viewOptions: { value: StatsView; label: string }[] = [
@@ -282,6 +285,11 @@ export function Stats<I extends Item, P extends Pattern>({
               <h2 id="stats-transfer" className="section-label">
                 記録の管理
               </h2>
+              {multipleDecks && (
+                <p className="hint">
+                  書き出し・読み込み・リセットは、すべての教材の記録をまとめて扱います。
+                </p>
+              )}
               <div className="card card-flat records">
                 <button
                   type="button"

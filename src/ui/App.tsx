@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { localDateKey } from '../core/date';
 import { deckModel, pickDeck, type DeckModel } from '../core/decks';
-import type { Deck, Question, Session } from '../core/models';
+import type { Deck, Pattern, Question, Session } from '../core/models';
 import { reviewCandidates } from '../core/review';
 import { streakDays } from '../core/stats';
 import decksJson from '../generated/decks.json';
@@ -15,6 +15,7 @@ import { Quiz, type QuizResult } from './screens/Quiz';
 import { QuizSetup } from './screens/QuizSetup';
 import { Result } from './screens/Result';
 import { ReviewSetup } from './screens/ReviewSetup';
+import { VocabularyQuizSetup } from './screens/VocabularyQuizSetup';
 import { Stats } from './screens/Stats';
 
 /**
@@ -99,8 +100,16 @@ export function App() {
     setView({ screen: 'quiz', session, questions });
 
   if (store !== null && view.screen === 'setup') {
-    return (
+    return current.kind === 'timeline' ? (
       <QuizSetup
+        store={store}
+        model={current}
+        deckName={deckName}
+        onStart={startQuiz}
+        onBack={goHome}
+      />
+    ) : (
+      <VocabularyQuizSetup
         store={store}
         model={current}
         deckName={deckName}
@@ -111,7 +120,7 @@ export function App() {
   }
   if (store !== null && view.screen === 'review-setup') {
     return (
-      <ReviewSetup
+      <ReviewSetup<Question['item'], Pattern>
         store={store}
         deckId={deck.id}
         deckName={deckName}
@@ -125,12 +134,13 @@ export function App() {
   }
   if (store !== null && view.screen === 'stats') {
     return (
-      <Stats
+      <Stats<Question['item'], Pattern>
         store={store}
         deckId={deck.id}
         deckName={deckName}
         population={current.population}
         rules={rules}
+        multipleDecks={SHOW_DECK_NAMES}
         onBack={goHome}
       />
     );
@@ -173,7 +183,7 @@ export function App() {
       reviewCount={
         store === null
           ? null
-          : reviewCandidates({
+          : reviewCandidates<Question['item'], Pattern>({
               population: current.population,
               allItems: deck.items,
               stats: store.listEventStats(),

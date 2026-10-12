@@ -71,6 +71,8 @@ describe('TIMELINE_RULES', () => {
     const event = ev('a', { year: 1185, title: '鎌倉幕府の成立', altYears: [1192] });
     expect(TIMELINE_RULES.itemTitle(event)).toBe('鎌倉幕府の成立');
     expect(TIMELINE_RULES.itemDetail(event)).toBe('1185年');
+    expect(TIMELINE_RULES.itemReading(event)).toBeNull();
+    expect(TIMELINE_RULES.resultLayout).toBe('inline');
     expect(TIMELINE_RULES.answerText(event)).toBe('1185年・1192年');
   });
 });

@@ -208,6 +208,16 @@ function parseRange(value: unknown): Range | null {
       }
       return { kind: 'years', from, to };
     }
+    case 'categories': {
+      const { categories } = value;
+      if (
+        !Array.isArray(categories) ||
+        categories.length === 0 ||
+        !categories.every((category) => typeof category === 'string' && category.length > 0)
+      )
+        return null;
+      return { kind: 'categories', categories: [...categories] };
+    }
     case 'eras': {
       const { eras } = value;
       if (!Array.isArray(eras) || !eras.every((era) => typeof era === 'string' && isEra(era))) {

@@ -2,6 +2,8 @@ import type { IDBPTransaction } from 'idb';
 import { localDateKey } from '../core/date';
 import type {
   Attempt,
+  DeckSettings,
+  VocabularySettings,
   EventStats,
   Pattern,
   PatternMode,
@@ -10,6 +12,7 @@ import type {
   SessionMode,
   Settings,
 } from '../core/models';
+import { normalizeVocabularySettings } from '../core/vocabulary';
 import { uuidFromRng } from '../core/random';
 import {
   LEGACY_DECK_ID,
@@ -17,7 +20,7 @@ import {
   type QLoopSchema,
   type SettingsKey,
   type StoredSession,
-  type StoredSettings,
+  type StoredDeckSettings,
 } from './db';
 import { EXPORT_SCHEMA_VERSION, parseProgressExport, type ProgressExport } from './transfer';
 
@@ -83,7 +86,7 @@ export class ProgressStore {
   private readonly sessions = new Map<string, Session>();
   private studyDays: string[] = [];
   /** 教材ごとの出題設定（`meta` の `settings:<教材の id>`）。キーは教材の id。 */
-  private readonly settings = new Map<string, Settings>();
+  private readonly settings = new Map<string, DeckSettings>();
   /** 1.0 の出題設定（`meta` の `settings`）。日本史年表の設定が無いときの初期値にだけ使う。 */
   private legacySettings: Settings | null = null;
   /** ホームで最後に選んだ教材の id（`meta` の `lastDeck`）。 */
@@ -267,15 +270,40 @@ export class ProgressStore {
   }
 
   /**
-   * 教材 `deckId` の、最後に保存した出題設定。まだ無ければ `null`。
+   * 教材 `deckId` の、最後に保存した出題設定。まだ無ければ `null`。`kind` は既定で年表、語彙では明示する。
+   * 語彙の設定は現在の種類の一覧にそろえて返す。
    * 日本史年表（`LEGACY_DECK_ID`）は、教材ごとの設定が無ければ 1.0 の設定（`meta` の `settings`）を返す。
    */
-  getSettings(deckId: string): Settings | null {
-    return this.settings.get(deckId) ?? (deckId === LEGACY_DECK_ID ? this.legacySettings : null);
+  getSettings(deckId: string, kind?: 'timeline'): Settings | null;
+  getSettings(deckId: string, kind: 'vocabulary'): VocabularySettings | null;
+  getSettings(deckId: string, kind: 'timeline' | 'vocabulary' = 'timeline'): DeckSettings | null {
+    const settings =
+      this.settings.get(deckId) ?? (deckId === LEGACY_DECK_ID ? this.legacySettings : null);
+    if (settings === null) return null;
+    if (kind === 'vocabulary') {
+      if (
+        (settings.pattern === 'meaningChoice' ||
+          settings.pattern === 'wordChoice' ||
+          settings.pattern === 'mixed') &&
+        (settings.range.kind === 'all' || settings.range.kind === 'categories')
+      ) {
+        return normalizeVocabularySettings(settings as VocabularySettings);
+      }
+      return null;
+    }
+    if (
+      (settings.pattern === 'yearInput' ||
+        settings.pattern === 'yearChoice' ||
+        settings.pattern === 'choice' ||
+        settings.pattern === 'mixed') &&
+      settings.range.kind !== 'categories'
+    )
+      return settings as Settings;
+    return null;
   }
 
   /** 教材 `deckId` の出題設定を `meta` の `settings:<教材の id>` に保存する。 */
-  async saveSettings(deckId: string, settings: Settings): Promise<void> {
+  async saveSettings(deckId: string, settings: DeckSettings): Promise<void> {
     const tx = this.db.transaction('meta', 'readwrite');
     await inTransaction(tx, async () => {
       await tx.objectStore('meta').put({ key: settingsKey(deckId), value: settings });
@@ -431,7 +459,7 @@ function settingsKey(deckId: string): SettingsKey {
 }
 
 /** 保存された出題設定を読む。`scope` が無い（PR 3 より前の）設定は `core` とみなす。 */
-function normalizeSettings(stored: StoredSettings): Settings {
+function normalizeSettings<T extends StoredDeckSettings>(stored: T): T & { scope: 'core' | 'all' } {
   return { ...stored, scope: stored.scope === 'all' ? 'all' : 'core' };
 }
 
