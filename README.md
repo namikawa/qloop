@@ -10,7 +10,7 @@
 ## ドキュメント
 
 - [`docs/design.md`](docs/design.md): 設計書（要件、データ形式、出題・復習・成績の仕様、配布）
-- [`docs/data.md`](docs/data.md): 年表データの手引き（年号の正誤の基準、列の使い分け、データを足す手順）
+- [`docs/data.md`](docs/data.md): 教材データの手引き（年表と語彙。正誤の基準、列の使い分け、データを足す手順）
 - [`docs/operations.md`](docs/operations.md): 運用手順（リリースとデプロイ、端末への導入、更新、成績のバックアップ、動作確認）
 - [`docs/visual-design.md`](docs/visual-design.md): 見た目のデザインの決まりと前提（配色・文字・ロゴ・アイコンの値と、見直すときに渡すもの）
 - [`docs/BACKLOG.md`](docs/BACKLOG.md): 新機能と改良の候補（採用して未着手のもの、保留中の候補、見送り）
