@@ -239,6 +239,8 @@ export interface EventStats {
   lastCorrect: boolean;
   /** 最後に不正解だった時刻（UTC の ISO 8601 文字列）。不正解が無ければ `null`。 */
   lastWrongAt: string | null;
+  /** 最後に間違えた後に続けて正解した回数。最後の回答が不正解なら 0（設計書 5.4・7 章）。 */
+  consecutiveCorrect: number;
 }
 
 /**

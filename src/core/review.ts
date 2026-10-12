@@ -8,6 +8,9 @@ const REVIEW_RECENT_WRONG_DAYS = 14;
 /** 「正答率が 60% 未満」の判定に使う回答数の下限（設計書 7 章の条件 3）。 */
 const LOW_ACCURACY_MIN_ATTEMPTS = 2;
 
+/** 復習から外す、最後に間違えた後の連続正解数の下限（設計書 7 章。間違えた日のうちは外さない）。 */
+const REVIEW_CONSECUTIVE_CORRECT = 2;
+
 /**
  * 復習が使う、教材の種類ごとの差分（設計書 5 章の冒頭）。復習は項目の中身をこれを通してだけ扱う。
  * 種類ごとの実装は `decks.ts` にある。
@@ -36,7 +39,8 @@ export interface ReviewCandidate<I extends Item = Item, P extends Pattern = Patt
 }
 
 /**
- * 集計が復習の条件を満たすか（設計書 7 章）。次のいずれかを満たせば候補にする。
+ * 集計が復習の条件を満たすか（設計書 7 章）。続けて 2 回以上正解し、最後の回答の暦日が
+ * 最後に間違えた暦日より後なら外す。それ以外は次のいずれかを満たせば候補にする。
  *
  * 1. `lastWrongAt` が、端末の現在のタイムゾーンで 14 日前の 0 時以降（境界を含む）。
  * 2. 最後の回答が不正解。
@@ -47,6 +51,13 @@ export function needsReview(
   now: Date,
   dateKey: DateKeyFn = localDateKey,
 ): boolean {
+  if (
+    stats.consecutiveCorrect >= REVIEW_CONSECUTIVE_CORRECT &&
+    stats.lastWrongAt !== null &&
+    calendarDaysBetween(new Date(stats.lastWrongAt), new Date(stats.lastAnsweredAt), dateKey) > 0
+  ) {
+    return false;
+  }
   if (
     stats.lastWrongAt !== null &&
     isWithinDays(new Date(stats.lastWrongAt), now, REVIEW_RECENT_WRONG_DAYS, dateKey)

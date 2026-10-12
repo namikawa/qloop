@@ -109,7 +109,10 @@ export function ReviewSetup<I extends Item, P extends Pattern>({
               <span className="review-count-unit"> 件</span>
             </p>
           )}
-          <p className="hint">最近間違えた問題や、正答率の低い問題を出します。</p>
+          <p className="hint">
+            最近間違えた問題や、正答率の低い問題を出します。続けて 2
+            回正解すると外れます。ただし、間違えた日のうちは外れません。
+          </p>
         </section>
 
         <Segmented
