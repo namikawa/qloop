@@ -1942,3 +1942,27 @@ button:disabled {
 .dialog-actions .button-primary {
   box-shadow: none;
 }
+
+/* 語彙の問いは言葉を大きく見せ、長い意味はカードの中で折り返す。 */
+.vocabulary-word {
+  font-size: 28px;
+}
+
+.vocabulary-question .question-card {
+  padding-bottom: var(--space-4);
+}
+
+.wrong-item-stacked {
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.wrong-reading {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+}
+
+.wrong-item-stacked .wrong-year {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

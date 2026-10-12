@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildDeckFromCsv, DECK_DEFINITIONS } from './decks';
 import { generateYearChoices, isYearChoiceEligible, isYearInputEligible } from './quiz';
+import { VOCABULARY_PATTERNS } from './models';
+import { buildQuestion, isEligibleFor } from './vocabulary';
 import { mulberry32 } from './random';
 
 /** data/ にある実際の CSV が検証を通ること（データを編集した PR をこのテストで守る）。教材の定義の一覧から読む。 */
@@ -66,6 +68,31 @@ for (const definition of DECK_DEFINITIONS) {
           }
         }
         expect(problems).toEqual([]);
+      });
+    }
+    if (definition.kind === 'vocabulary') {
+      it('基本データの全行と適格な追加データで、両パターンの正解と除外規則を守る 4 択を作れる', () => {
+        expect(result.ok).toBe(true);
+        if (!result.ok || result.deck.kind !== 'vocabulary') return;
+        const { items } = result.deck;
+        for (const word of items) {
+          for (const pattern of VOCABULARY_PATTERNS) {
+            const eligible = isEligibleFor(word, pattern, items);
+            if (word.role === 'core') expect(eligible, word.id).toBe(true);
+            if (!eligible) continue;
+            for (let seed = 0; seed < 20; seed++) {
+              const question = buildQuestion(word, pattern, items, 2026, mulberry32(seed));
+              expect(question.choices, word.id).toHaveLength(4);
+              expect(new Set(question.choices.map((choice) => choice.id)).size).toBe(4);
+              expect(question.choices).toContain(word);
+              for (const choice of question.choices.filter((choice) => choice.id !== word.id)) {
+                expect(choice.category).toBe(word.category);
+                expect(word.similar).not.toContain(choice.id);
+                expect(choice.similar).not.toContain(word.id);
+              }
+            }
+          }
+        }
       });
     }
   });

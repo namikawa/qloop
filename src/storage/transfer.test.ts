@@ -382,3 +382,41 @@ describe('exportFileName', () => {
     expect(exportFileName(new Date(2027, 0, 2, 0, 0))).toBe('qloop-progress-20270102.json');
   });
 });
+
+describe('語彙の書き出しファイル', () => {
+  it.each(['meaningChoice', 'wordChoice'])(
+    '%s の回答・履歴と、現在の一覧に無い種類も受け付ける',
+    (pattern) => {
+      const parsed = parseProgressExport(
+        variant((data) => {
+          firstAttempt(data).pattern = pattern;
+          firstAttempt(data).eventId = 'jv-0001';
+          firstSession(data).pattern = pattern;
+          firstSession(data).deckId = 'japanese-vocabulary';
+          firstSession(data).range = {
+            kind: 'categories',
+            categories: ['慣用句', '現在は無い種類'],
+            ignored: true,
+          };
+        }),
+      );
+      expect(parsed.attempts[0]).toMatchObject({ eventId: 'jv-0001', pattern });
+      expect(parsed.sessions[0]).toMatchObject({
+        pattern,
+        range: { kind: 'categories', categories: ['慣用句', '現在は無い種類'] },
+      });
+    },
+  );
+  it.each([[], [''], ['慣用句', ''], ['慣用句', 1], [null], '慣用句', null, undefined])(
+    '種類が空でない文字列の配列でない場合 %j を拒む',
+    (categories) => {
+      expect(() =>
+        parseProgressExport(
+          variant((data) => {
+            firstSession(data).range = { kind: 'categories', categories };
+          }),
+        ),
+      ).toThrow(/sessions の 1 件目: range が不正です/);
+    },
+  );
+});

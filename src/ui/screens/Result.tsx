@@ -10,7 +10,10 @@ import type { AnsweredQuestion, QuizResult } from './Quiz';
 interface ResultProps {
   result: QuizResult;
   /** 出題した教材の種類の差分（画面の言葉と、間違えた項目の表示）。 */
-  rules: Pick<KindRules<AnsweredQuestion['item'], Pattern>, 'labels' | 'itemTitle' | 'answerText'>;
+  rules: Pick<
+    KindRules<AnsweredQuestion['item'], Pattern>,
+    'labels' | 'itemTitle' | 'itemReading' | 'resultLayout' | 'answerText'
+  >;
   onHome: () => void;
 }
 
@@ -95,13 +98,24 @@ export function Result({ result, rules, onHome }: ResultProps) {
             <p className="empty-text">ありません</p>
           ) : (
             <ul className="card card-flat list-card" data-testid="wrong-list">
-              {wrong.map((answer) => (
+              {wrong.map((answer) => {
+                const reading = rules.itemReading(answer.item);
                 // 復習では同じ項目が複数のパターンで出ることがあるので、パターンも key に含める
-                <li key={`${answer.pattern}:${answer.item.id}`} className="wrong-item">
-                  <span className="wrong-title">{rules.itemTitle(answer.item)}</span>
-                  <span className="wrong-year">{rules.answerText(answer.item)}</span>
-                </li>
-              ))}
+                return (
+                  <li
+                    key={`${answer.pattern}:${answer.item.id}`}
+                    className={
+                      rules.resultLayout === 'stacked'
+                        ? 'wrong-item wrong-item-stacked'
+                        : 'wrong-item'
+                    }
+                  >
+                    <span className="wrong-title">{rules.itemTitle(answer.item)}</span>
+                    {reading !== null && <span className="wrong-reading">{reading}</span>}
+                    <span className="wrong-year">{rules.answerText(answer.item)}</span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>

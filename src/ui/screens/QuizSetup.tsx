@@ -6,7 +6,7 @@ import type {
   EventScope,
   Question,
   QuestionCount,
-  Range,
+  TimelineRange,
   Session,
   Settings,
   TimelinePatternMode,
@@ -44,7 +44,7 @@ export const COUNT_OPTIONS: { value: QuestionCount; label: string }[] = [
   { value: 'all', label: '全問' },
 ];
 
-const RANGE_OPTIONS: { value: Range['kind']; label: string }[] = [
+const RANGE_OPTIONS: { value: TimelineRange['kind']; label: string }[] = [
   { value: 'all', label: '全範囲' },
   { value: 'years', label: '年号の範囲' },
   { value: 'eras', label: '時代' },
@@ -81,7 +81,7 @@ export function QuizSetup({ store, model, deckName, onStart, onBack }: QuizSetup
   const [scope, setScope] = useState<EventScope>(initial.scope);
   const [pattern, setPattern] = useState<TimelinePatternMode>(initial.pattern);
   const [count, setCount] = useState<QuestionCount>(initial.count);
-  const [rangeKind, setRangeKind] = useState<Range['kind']>(initial.range.kind);
+  const [rangeKind, setRangeKind] = useState<TimelineRange['kind']>(initial.range.kind);
   // 範囲の種類を切り替えても、年と時代の入力は残しておく
   const [fromText, setFromText] = useState(
     initial.range.kind === 'years' ? (initial.range.from?.toString() ?? '') : '',
@@ -97,7 +97,7 @@ export function QuizSetup({ store, model, deckName, onStart, onBack }: QuizSetup
 
   const from = parseRangeYear(fromText);
   const to = parseRangeYear(toText);
-  let range: Range | null = null;
+  let range: TimelineRange | null = null;
   let problem: string | null = null;
   if (rangeKind === 'all') {
     range = { kind: 'all' };
@@ -285,16 +285,16 @@ export function QuizSetup({ store, model, deckName, onStart, onBack }: QuizSetup
   );
 }
 
-interface PatternFieldProps {
-  options: readonly { value: TimelinePatternMode; label: string; description: string }[];
-  value: TimelinePatternMode;
-  onChange: (value: TimelinePatternMode) => void;
+interface PatternFieldProps<P extends string> {
+  options: readonly { value: P; label: string; description: string }[];
+  value: P;
+  onChange: (value: P) => void;
 }
 
 /**
  * 出題パターンの選択（2 列のカード）。ラジオボタンの名前はパターン名だけにし、説明は aria-describedby で添える。
  */
-function PatternField({ options, value, onChange }: PatternFieldProps) {
+export function PatternField<P extends string>({ options, value, onChange }: PatternFieldProps<P>) {
   const idPrefix = useId();
   return (
     <fieldset className="field">

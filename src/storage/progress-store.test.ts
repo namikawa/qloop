@@ -6,7 +6,7 @@ import { generateReviewSession, reviewCandidates } from '../core/review';
 import { summarizeStats } from '../core/stats';
 import { openDb, type QLoopDb, type StoredSession } from './db';
 import { ProgressStore, type StartSessionInput } from './progress-store';
-import { ImportFormatError, type ProgressExport } from './transfer';
+import { ImportFormatError, parseProgressExport, type ProgressExport } from './transfer';
 
 let dbCount = 0;
 let dbName: string;
@@ -1268,5 +1268,96 @@ describe('2 つの教材の記録', () => {
     expect(reloaded.store.getSession(otherSession.id)?.deckId).toBe(other.deck.id);
     expect(reloaded.store.getSettings(history.deck.id)).toMatchObject({ pattern: 'yearInput' });
     expect(reloaded.store.getSettings(other.deck.id)).toMatchObject({ pattern: 'mixed' });
+  });
+});
+
+describe('語彙の出題設定と記録', () => {
+  const vocabulary = 'japanese-vocabulary';
+  it('年表と別の鍵に保存し、再読み込みしても双方を保つ', async () => {
+    const { store, db } = await createStore();
+    const timeline: Settings = {
+      scope: 'all',
+      pattern: 'yearChoice',
+      count: 20,
+      range: { kind: 'eras', eras: ['江戸'] },
+    };
+    const words = {
+      scope: 'core' as const,
+      pattern: 'wordChoice' as const,
+      count: 10 as const,
+      range: { kind: 'categories' as const, categories: ['慣用句'] },
+    };
+    expect(store.getSettings(vocabulary, 'vocabulary')).toBeNull();
+    await store.saveSettings(HISTORY, timeline);
+    await store.saveSettings(vocabulary, words);
+    expect(await db.get('meta', `settings:${vocabulary}`)).toEqual({
+      key: `settings:${vocabulary}`,
+      value: words,
+    });
+    const reloaded = (await createStore(db)).store;
+    expect(reloaded.getSettings(HISTORY)).toEqual(timeline);
+    expect(reloaded.getSettings(vocabulary, 'vocabulary')).toEqual(words);
+  });
+  it.each([
+    [['削除済み', '慣用句', '慣用句'], { kind: 'categories', categories: ['慣用句'] }],
+    [['削除済み'], { kind: 'all' }],
+    [[], { kind: 'all' }],
+  ])('保存した種類 %j から現在の一覧に無いものを外す', async (categories, range) => {
+    const { store, db } = await createStore();
+    await store.saveSettings(vocabulary, {
+      scope: 'all',
+      pattern: 'mixed',
+      count: 'all',
+      range: { kind: 'categories', categories },
+    });
+    const reloaded = (await createStore(db)).store;
+    expect(reloaded.getSettings(vocabulary, 'vocabulary')).toEqual({
+      scope: 'all',
+      pattern: 'mixed',
+      count: 'all',
+      range,
+    });
+  });
+  it('1.0 の settings を語彙の初期値にしない', async () => {
+    const db = await open();
+    const legacy: Settings = { scope: 'all', pattern: 'choice', count: 20, range: { kind: 'all' } };
+    await db.put('meta', { key: 'settings', value: legacy });
+    const { store } = await createStore(db);
+    expect(store.getSettings(HISTORY)).toEqual(legacy);
+    expect(store.getSettings(vocabulary, 'vocabulary')).toBeNull();
+  });
+  it('両パターンの回答と種類の範囲を版 2 で書き出し・読み込みできる', async () => {
+    const { store } = await createStore();
+    const session = await store.startSession({
+      deckId: vocabulary,
+      mode: 'normal',
+      pattern: 'mixed',
+      range: { kind: 'categories', categories: ['慣用句'] },
+      total: 2,
+    });
+    await store.recordAnswer({
+      sessionId: session.id,
+      eventId: 'jv-0001',
+      pattern: 'meaningChoice',
+      correct: true,
+      endSession: false,
+    });
+    await store.recordAnswer({
+      sessionId: session.id,
+      eventId: 'jv-0002',
+      pattern: 'wordChoice',
+      correct: false,
+      endSession: true,
+    });
+    const data = await store.exportData();
+    expect(data.schemaVersion).toBe(2);
+    await store.importData(data);
+    expect(parseProgressExport(await store.exportData())).toEqual(parseProgressExport(data));
+    expect(store.listEventStats()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ eventId: 'jv-0001', pattern: 'meaningChoice', correct: 1 }),
+        expect.objectContaining({ eventId: 'jv-0002', pattern: 'wordChoice', correct: 0 }),
+      ]),
+    );
   });
 });

@@ -1,6 +1,6 @@
 {
   "name": "qloop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "1 問 1 答で勉強する PWA（最初の教材は日本史の年表）",
   "license": "MIT",

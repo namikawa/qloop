@@ -1,5 +1,12 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { Attempt, EventStats, Pattern, Session, Settings } from '../core/models';
+import type {
+  Attempt,
+  EventStats,
+  Pattern,
+  Session,
+  Settings,
+  VocabularySettings,
+} from '../core/models';
 
 /** データベース名と版（設計書 5.4 節）。スキーマを変えるときは版を上げ、`upgrade` に移行を書く。 */
 const DB_NAME = 'qloop';
@@ -16,13 +23,16 @@ export const LEGACY_DECK_ID = 'japanese-history';
  */
 export type StoredSettings = Omit<Settings, 'scope'> & Partial<Pick<Settings, 'scope'>>;
 
+/** 全種類の教材で保存する出題設定。 */
+export type StoredDeckSettings = StoredSettings | VocabularySettings;
+
 /** 教材ごとの出題設定の `meta` の鍵（`settings:<教材の id>`）。 */
 export type SettingsKey = `settings:${string}`;
 
 /** `meta` ストアのレコード。`key` で種類を分ける。 */
 type MetaRecord =
   /** 教材ごとの出題設定。 */
-  | { key: SettingsKey; value: StoredSettings }
+  | { key: SettingsKey; value: StoredDeckSettings }
   /** 1.0 の出題設定（年表のもの）。読むときだけ使う。 */
   | { key: 'settings'; value: StoredSettings }
   /** ホームで最後に選んだ教材の id。 */

@@ -2,11 +2,17 @@ import { buildDeck } from './deck';
 import { ERAS } from './era';
 import {
   TIMELINE_PATTERNS,
+  VOCABULARY_PATTERNS,
   type Deck,
   type DeckKind,
   type Event,
   type Item,
   type Pattern,
+  type PatternMode,
+  type VocabularyDeck,
+  type VocabularyPattern,
+  type VocabularyPatternMode,
+  type Word,
   type TimelineDeck,
   type TimelinePattern,
   type TimelinePatternMode,
@@ -15,6 +21,12 @@ import { buildQuestion, isEligibleFor, population } from './quiz';
 import { formatRange } from './range';
 import type { ReviewRules } from './review';
 import type { SessionLabels, StatsRules } from './stats';
+import {
+  VOCABULARY_CATEGORIES,
+  buildVocabularyDeck,
+  buildQuestion as buildVocabularyQuestion,
+  isEligibleFor as isVocabularyEligibleFor,
+} from './vocabulary';
 import { formatAnswerYears, formatEventYear } from './year';
 
 /**
@@ -51,6 +63,13 @@ export const DECK_DEFINITIONS: readonly DeckDefinition[] = [
     idPrefix: 'jh-',
     dir: 'japanese-history',
   },
+  {
+    id: 'japanese-vocabulary',
+    kind: 'vocabulary',
+    name: '語彙',
+    idPrefix: 'jv-',
+    dir: 'japanese-vocabulary',
+  },
 ];
 
 export type BuildDeckFromCsvResult = { ok: true; deck: Deck } | { ok: false; errors: string[] };
@@ -64,6 +83,8 @@ export function buildDeckFromCsv(
   files: { core: string; pool: string },
 ): BuildDeckFromCsvResult {
   switch (definition.kind) {
+    case 'vocabulary':
+      return buildVocabularyDeck({ ...definition, ...files, categories: VOCABULARY_CATEGORIES });
     case 'timeline':
       return buildDeck({
         id: definition.id,
@@ -97,6 +118,10 @@ export interface KindRules<I extends Item, P extends Pattern>
   itemTitle(item: I): string;
   /** 成績の項目別で、見出しの下に出す補足。年表は年の表示。 */
   itemDetail(item: I): string;
+  /** 一覧に添える読み（設計書 5.7・6.8 節、8 章）。読みが無い項目は null。 */
+  itemReading(item: I): string | null;
+  /** まとめの一覧の並べ方（設計書 6.4・6.8 節）。年表は横、語彙は縦に並べる。 */
+  readonly resultLayout: 'inline' | 'stacked';
   /** まとめの間違えた項目に添える正解。年表は正解の年（別解を併記）。 */
   answerText(item: I): string;
 }
@@ -114,7 +139,8 @@ export const TIMELINE_RULES: KindRules<Event, TimelinePattern> = {
   kind: 'timeline',
   labels: { item: '出来事', core: '基本の年表', group: '時代' },
   patterns: TIMELINE_PATTERNS,
-  patternLabel: (pattern) => TIMELINE_PATTERN_LABELS[pattern],
+  patternLabel: (pattern: PatternMode) =>
+    TIMELINE_PATTERN_LABELS[pattern as TimelinePatternMode] ?? pattern,
   formatRange,
   isEligibleFor,
   buildQuestion,
@@ -122,25 +148,71 @@ export const TIMELINE_RULES: KindRules<Event, TimelinePattern> = {
   groupOf: (event) => event.era,
   itemTitle: (event) => event.title,
   itemDetail: (event) => formatEventYear(event),
+  itemReading: () => null,
+  resultLayout: 'inline',
   answerText: (event) => formatAnswerYears(event),
+};
+
+const VOCABULARY_PATTERN_LABELS: Readonly<Record<VocabularyPatternMode, string>> = {
+  meaningChoice: '意味 4 択',
+  wordChoice: '言葉 4 択',
+  mixed: 'ミックス',
+};
+
+/** 語彙の教材の差分（設計書 5.7・6.8 節、7・8 章）。 */
+export const VOCABULARY_RULES: KindRules<Word, VocabularyPattern> = {
+  kind: 'vocabulary',
+  labels: { item: '言葉', core: '基本の語彙', group: '種類' },
+  patterns: VOCABULARY_PATTERNS,
+  patternLabel: (pattern: PatternMode) =>
+    VOCABULARY_PATTERN_LABELS[pattern as VocabularyPatternMode] ?? pattern,
+  formatRange,
+  isEligibleFor: isVocabularyEligibleFor,
+  buildQuestion: buildVocabularyQuestion,
+  groups: VOCABULARY_CATEGORIES,
+  groupOf: (word) => word.category,
+  itemTitle: (word) => word.word,
+  itemDetail: (word) => (word.reading ? `${word.reading} · ${word.category}` : word.category),
+  itemReading: (word) => word.reading,
+  resultLayout: 'stacked',
+  answerText: (word) => word.meaning,
 };
 
 /** 年表の教材と、その差分・母集団。 */
 export interface TimelineDeckModel {
+  kind: 'timeline';
   deck: TimelineDeck;
   rules: KindRules<Event, TimelinePattern>;
   /** 出題の母集団（`level` が `中学` の項目）。復習と成績はこの全体を対象にする。 */
   population: Event[];
 }
 
-/** 教材（`decks.json` の 1 要素）と、その種類の差分・母集団をまとめたもの。画面はこれを通して教材を扱う。 */
-export type DeckModel = TimelineDeckModel;
+/** 語彙の教材と、その差分・母集団（設計書 5 章の冒頭・6.8 節）。 */
+export interface VocabularyDeckModel {
+  kind: 'vocabulary';
+  deck: VocabularyDeck;
+  rules: KindRules<Word, VocabularyPattern>;
+  population: Word[];
+}
+
+/** 教材と、その種類の差分・母集団（設計書 5 章の冒頭）。画面はこれを通して教材を扱う。 */
+export type DeckModel = TimelineDeckModel | VocabularyDeckModel;
 
 /** 教材の種類の差分を組み合わせる（教材の種類で振り分ける）。 */
+export function deckModel(deck: TimelineDeck): TimelineDeckModel;
+export function deckModel(deck: VocabularyDeck): VocabularyDeckModel;
+export function deckModel(deck: Deck): DeckModel;
 export function deckModel(deck: Deck): DeckModel {
   switch (deck.kind) {
     case 'timeline':
-      return { deck, rules: TIMELINE_RULES, population: population(deck.items) };
+      return { kind: 'timeline', deck, rules: TIMELINE_RULES, population: population(deck.items) };
+    case 'vocabulary':
+      return {
+        kind: 'vocabulary',
+        deck,
+        rules: VOCABULARY_RULES,
+        population: population(deck.items),
+      };
   }
 }
 
