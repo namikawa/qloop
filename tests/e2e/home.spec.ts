@@ -10,13 +10,13 @@ const INSTALL_MESSAGE = 'Safari の共有メニューから『ホーム画面に
 
 test('ホーム画面に教材名・件数・版が表示され、横スクロールしない', async ({ page }) => {
   const cspViolations = collectCspViolations(page);
-  // deck.json は webServer のビルドで生成されるので、テストの中で読む
+  // decks.json は webServer のビルドで生成されるので、テストの中で読む
   const { version } = readJson<{ version: string }>('../../package.json');
-  const deck = readJson<{ events: { role: string; level: string }[] }>(
-    '../../src/generated/deck.json',
+  const [deck] = readJson<{ items: { role: string; level: string }[] }[]>(
+    '../../src/generated/decks.json',
   );
   // 出題できる出来事は母集団（core.csv と pool.csv の中学の出来事）、基本の年表はそのうち core.csv の行
-  const targets = deck.events.filter((event) => event.level === '中学');
+  const targets = deck.items.filter((event) => event.level === '中学');
   const coreCount = targets.filter((event) => event.role === 'core').length;
 
   await page.goto('/');

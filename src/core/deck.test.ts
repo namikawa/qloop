@@ -40,7 +40,13 @@ const FILLER = [
 ];
 
 function build(core: string[][], pool: string[][] = FILLER) {
-  return buildDeck({ id: 'test', name: 'テスト', core: csv(...core), pool: csv(...pool) });
+  return buildDeck({
+    id: 'test',
+    name: 'テスト',
+    idPrefix: 'jh-',
+    core: csv(...core),
+    pool: csv(...pool),
+  });
 }
 
 function errorsOf(result: ReturnType<typeof buildDeck>): string[] {
@@ -62,8 +68,9 @@ describe('buildDeck', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.deck.id).toBe('test');
+    expect(result.deck.kind).toBe('timeline');
     expect(result.deck.name).toBe('テスト');
-    expect(result.deck.events.slice(0, 4)).toEqual([
+    expect(result.deck.items.slice(0, 4)).toEqual([
       {
         id: 'jh-0001',
         year: 710,
@@ -109,11 +116,7 @@ describe('buildDeck', () => {
         role: 'core',
       },
     ]);
-    expect(result.deck.events.slice(4).map((event) => event.role)).toEqual([
-      'pool',
-      'pool',
-      'pool',
-    ]);
+    expect(result.deck.items.slice(4).map((event) => event.role)).toEqual(['pool', 'pool', 'pool']);
   });
 
   it('alt_years は ; 区切りで複数書け、セルの前後の空白は無視する', () => {
@@ -122,7 +125,7 @@ describe('buildDeck', () => {
     ]);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.deck.events[0]).toMatchObject({
+    expect(result.deck.items[0]).toMatchObject({
       year: 1185,
       title: '鎌倉幕府の成立',
       altYears: [1183, 1192],
@@ -160,6 +163,21 @@ describe('buildDeck', () => {
   it('仮データの demo- で始まる id は受け付けない', () => {
     const result = build([row('demo-0001', '710', '出来事 A')]);
     expect(errorsOf(result)).toEqual(['core.csv 2 行目 id: 「demo-0001」は jh- で始めてください']);
+  });
+
+  it('id の接頭辞は教材の定義から受け取る', () => {
+    const result = buildDeck({
+      id: 'other',
+      name: '別の年表',
+      idPrefix: 'th-',
+      core: csv(row('th-0001', '710', '出来事 A'), row('jh-0002', '794', '出来事 B')),
+      pool: csv(
+        row('th-0901', '100', '誤答用の出来事 1'),
+        row('th-0902', '900', '誤答用の出来事 2'),
+        row('th-0903', '1700', '誤答用の出来事 3'),
+      ),
+    });
+    expect(errorsOf(result)).toEqual(['core.csv 3 行目 id: 「jh-0002」は th- で始めてください']);
   });
 
   it('year は 0 以外の整数', () => {
@@ -254,6 +272,7 @@ describe('buildDeck', () => {
     const result = buildDeck({
       id: 'test',
       name: 'テスト',
+      idPrefix: 'jh-',
       core: 'jh-0001,710,出来事 A,,,,,\n',
       pool: csv(...FILLER) + 'jh-0904,1800\n',
     });
@@ -267,6 +286,7 @@ describe('buildDeck', () => {
     const result = buildDeck({
       id: 'test',
       name: 'テスト',
+      idPrefix: 'jh-',
       core: csv(row('jh-0001', '0', '出来事 A')) + 'jh-0002,"x\n' + 'jh-0003,1,2\n',
       pool: csv(row('jh-0101', 'x', '出来事 B')),
     });

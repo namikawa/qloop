@@ -1,13 +1,5 @@
 import { calendarDaysBetween, isWithinDays, localDateKey, type DateKeyFn } from './date';
-import {
-  PATTERNS,
-  type Event,
-  type EventStats,
-  type Pattern,
-  type Question,
-  type QuestionCount,
-} from './models';
-import { buildQuestion, isEligibleFor } from './quiz';
+import type { EventStats, Item, Pattern, Question, QuestionCount } from './models';
 import type { Rng } from './random';
 
 /** 「直近 N 日以内に不正解がある」の日数（設計書 7 章の条件 1。境界を含む）。 */
@@ -16,10 +8,29 @@ const REVIEW_RECENT_WRONG_DAYS = 14;
 /** 「正答率が 60% 未満」の判定に使う回答数の下限（設計書 7 章の条件 3）。 */
 const LOW_ACCURACY_MIN_ATTEMPTS = 2;
 
-/** 復習の候補（出来事, パターン）と、その重み。 */
-export interface ReviewCandidate {
-  event: Event;
-  pattern: Pattern;
+/**
+ * 復習が使う、教材の種類ごとの差分（設計書 5 章の冒頭）。復習は項目の中身をこれを通してだけ扱う。
+ * 種類ごとの実装は `decks.ts` にある。
+ */
+export interface ReviewRules<I extends Item, P extends Pattern> {
+  /** その種類の出題パターン（候補の並びの順）。 */
+  readonly patterns: readonly P[];
+  /** 項目がそのパターンに出題できるか。`allItems` は誤答の候補に使う全項目。 */
+  isEligibleFor(item: I, pattern: P, allItems: readonly I[]): boolean;
+  /** 項目とパターンから 1 問を作り、選択肢を確定する（項目はそのパターンに適格であること）。 */
+  buildQuestion(
+    item: I,
+    pattern: P,
+    allItems: readonly I[],
+    currentYear: number,
+    rng: Rng,
+  ): Question;
+}
+
+/** 復習の候補（項目, パターン）と、その重み。 */
+export interface ReviewCandidate<I extends Item = Item, P extends Pattern = Pattern> {
+  item: I;
+  pattern: P;
   /** 抽選の重み（3・2・1）。 */
   weight: number;
 }
@@ -71,48 +82,52 @@ export function reviewWeight(
   return 1;
 }
 
-export interface ReviewCandidatesInput {
-  /** 現在の母集団（`population(deck)`）。出題設定の「出題する出来事」では絞り込まない。 */
-  population: readonly Event[];
-  /** 出来事 4 択の適格判定と誤答の候補に使う全出来事。 */
-  allEvents: readonly Event[];
-  /** `eventStats` の一覧。 */
+export interface ReviewCandidatesInput<I extends Item, P extends Pattern> {
+  /** 選んだ教材の母集団（`population(deck.items)`）。出題設定の「出題する項目」では絞り込まない。 */
+  population: readonly I[];
+  /** 4 択の適格判定と誤答の候補に使う、その教材の全項目。 */
+  allItems: readonly I[];
+  /** `eventStats` の一覧（全教材の分。母集団に無い項目の集計は使わない）。 */
   stats: readonly EventStats[];
   now: Date;
   /** 暦。既定は端末ローカルの暦。 */
   dateKey?: DateKeyFn;
+  /** その教材の種類の差分。 */
+  rules: ReviewRules<I, P>;
 }
 
 /**
- * 復習の候補を選ぶ（設計書 7 章）。現在の母集団に存在し、記録されたパターンに今も適格で（`isEligibleFor`）、
- * `needsReview` を満たす（出来事, パターン）の組。現在のデータに無い `eventId` の集計は候補にしない。
- * 並びは母集団の順で、同じ出来事は年号入力・年号 4 択・出来事 4 択の順。
+ * 復習の候補を選ぶ（設計書 7 章）。選んだ教材の母集団に存在し、記録されたパターン（その種類のパターンのいずれか）に
+ * 今も適格で、`needsReview` を満たす（項目, パターン）の組。母集団に無い `eventId` の集計（現在のデータに無い項目や
+ * 別の教材の項目）は候補にしない。並びは母集団の順で、同じ項目は `rules.patterns` の順（年表は年号入力・年号 4 択・
+ * 出来事 4 択）。
  */
-export function reviewCandidates({
+export function reviewCandidates<I extends Item, P extends Pattern>({
   population,
-  allEvents,
+  allItems,
   stats,
   now,
   dateKey = localDateKey,
-}: ReviewCandidatesInput): ReviewCandidate[] {
+  rules,
+}: ReviewCandidatesInput<I, P>): ReviewCandidate<I, P>[] {
   const byKey = new Map<string, EventStats>();
   for (const record of stats) {
     byKey.set(`${record.pattern}:${record.eventId}`, record);
   }
-  const result: ReviewCandidate[] = [];
+  const result: ReviewCandidate<I, P>[] = [];
   const seen = new Set<string>();
-  for (const event of population) {
-    if (seen.has(event.id)) {
+  for (const item of population) {
+    if (seen.has(item.id)) {
       continue;
     }
-    seen.add(event.id);
-    for (const pattern of PATTERNS) {
-      const record = byKey.get(`${pattern}:${event.id}`);
-      if (record === undefined || !isEligibleFor(event, pattern, allEvents)) {
+    seen.add(item.id);
+    for (const pattern of rules.patterns) {
+      const record = byKey.get(`${pattern}:${item.id}`);
+      if (record === undefined || !rules.isEligibleFor(item, pattern, allItems)) {
         continue;
       }
       if (needsReview(record, now, dateKey)) {
-        result.push({ event, pattern, weight: reviewWeight(record, now, dateKey) });
+        result.push({ item, pattern, weight: reviewWeight(record, now, dateKey) });
       }
     }
   }
@@ -147,31 +162,34 @@ export function weightedSample<T extends { weight: number }>(
   return picked;
 }
 
-export interface GenerateReviewSessionInput {
+export interface GenerateReviewSessionInput<I extends Item, P extends Pattern> {
   /** セッション開始時に確定した候補と重み（`reviewCandidates` の結果）。 */
-  candidates: readonly ReviewCandidate[];
-  /** 出来事 4 択の誤答の候補に使う全出来事。 */
-  allEvents: readonly Event[];
+  candidates: readonly ReviewCandidate<I, P>[];
+  /** 4 択の誤答の候補に使う、その教材の全項目。 */
+  allItems: readonly I[];
   count: QuestionCount;
   /** 今年（端末の現在の暦年）。年号 4 択の誤答から、これより後の年を除く。 */
   currentYear: number;
   rng: Rng;
+  /** その教材の種類の差分。 */
+  rules: ReviewRules<I, P>;
 }
 
 /**
  * 復習の問題列を作る（設計書 7 章）。候補から重み付きで重複なく問題数（足りなければ全件）を選び、
- * 選んだ順に出題する。出題パターンは記録されたパターンをそのまま使い、年号 4 択と出来事 4 択の選択肢は
- * ここで作り直して確定する。同じ出来事が複数のパターンで候補なら、パターンごとに 1 問ずつ出ることがある。
+ * 選んだ順に出題する。出題パターンは記録されたパターンをそのまま使い、4 択の選択肢は
+ * ここで作り直して確定する。同じ項目が複数のパターンで候補なら、パターンごとに 1 問ずつ出ることがある。
  */
-export function generateReviewSession({
+export function generateReviewSession<I extends Item, P extends Pattern>({
   candidates,
-  allEvents,
+  allItems,
   count,
   currentYear,
   rng,
-}: GenerateReviewSessionInput): Question[] {
+  rules,
+}: GenerateReviewSessionInput<I, P>): Question[] {
   const size = count === 'all' ? candidates.length : count;
-  return weightedSample(candidates, size, rng).map(({ event, pattern }) =>
-    buildQuestion(event, pattern, allEvents, currentYear, rng),
+  return weightedSample(candidates, size, rng).map(({ item, pattern }) =>
+    rules.buildQuestion(item, pattern, allItems, currentYear, rng),
   );
 }

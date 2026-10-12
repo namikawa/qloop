@@ -11,7 +11,14 @@ import type {
   Settings,
 } from '../core/models';
 import { uuidFromRng } from '../core/random';
-import type { QLoopDb, QLoopSchema, StoredSettings } from './db';
+import {
+  LEGACY_DECK_ID,
+  type QLoopDb,
+  type QLoopSchema,
+  type SettingsKey,
+  type StoredSession,
+  type StoredSettings,
+} from './db';
 import { EXPORT_SCHEMA_VERSION, parseProgressExport, type ProgressExport } from './transfer';
 
 export interface ProgressStoreOptions {
@@ -25,6 +32,8 @@ export interface ProgressStoreOptions {
 }
 
 export interface StartSessionInput {
+  /** 教材の id。 */
+  deckId: string;
   mode: SessionMode;
   /** 復習は `null`。 */
   pattern: PatternMode | null;
@@ -56,9 +65,13 @@ function statsKey(eventId: string, pattern: Pattern): string {
 }
 
 /**
- * 成績の状態を持つ唯一のオブジェクト（設計書 5.4 節）。
+ * 成績の状態を持つ唯一のオブジェクト（設計書 5.4 節）。全教材の記録をまとめて持つ。
  * IndexedDB への保存と、メモリ上の集計（`eventStats`・`sessions`・`meta`）の更新を同じ内容で行う。
  * 起動時の `load()` では `attempts` の全件は読まない。書き込みに失敗したら例外を投げ、メモリ上の状態は変えない。
+ *
+ * `attempts`・`eventStats` に教材の id は持たない（教材ごとの成績と復習は、教材の母集団で絞る）。教材を持つのは
+ * セッションの `deckId` と、`meta` の教材ごとの出題設定（`settings:<教材の id>`）・`lastDeck` だけ。
+ * 1.0 の記録（`deckId` の無いセッション、`meta` の `settings`）は日本史年表（`LEGACY_DECK_ID`）のものとして読む。
  */
 export class ProgressStore {
   private readonly db: QLoopDb;
@@ -69,7 +82,12 @@ export class ProgressStore {
   private readonly stats = new Map<string, EventStats>();
   private readonly sessions = new Map<string, Session>();
   private studyDays: string[] = [];
-  private settings: Settings | null = null;
+  /** 教材ごとの出題設定（`meta` の `settings:<教材の id>`）。キーは教材の id。 */
+  private readonly settings = new Map<string, Settings>();
+  /** 1.0 の出題設定（`meta` の `settings`）。日本史年表の設定が無いときの初期値にだけ使う。 */
+  private legacySettings: Settings | null = null;
+  /** ホームで最後に選んだ教材の id（`meta` の `lastDeck`）。 */
+  private lastDeck: string | null = null;
 
   constructor({
     db,
@@ -84,9 +102,9 @@ export class ProgressStore {
   }
 
   /**
-   * `eventStats`・`sessions`・`meta` を読んでメモリに持つ。
+   * `eventStats`・`sessions`・`meta`（出題設定・最後に選んだ教材・学習日）を読んでメモリに持つ。
    * 同じトランザクションで、`endedAt` が `null` で回答が 0 件のセッションを削除する（設計書 6.4 節の 7）。
-   * 回答が 1 件以上ある未終了のセッションは中断として残す。
+   * 回答が 1 件以上ある未終了のセッションは中断として残す。`deckId` の無いセッションには `LEGACY_DECK_ID` を補う。
    */
   async load(): Promise<void> {
     const tx = this.db.transaction(['eventStats', 'sessions', 'meta'], 'readwrite');
@@ -103,7 +121,7 @@ export class ProgressStore {
         if (session.endedAt === null && session.answered === 0) {
           deletions.push(sessionStore.delete(session.id));
         } else {
-          sessions.push(session);
+          sessions.push(normalizeSession(session));
         }
       }
       await Promise.all(deletions);
@@ -111,21 +129,31 @@ export class ProgressStore {
     });
 
     let studyDays: string[] = [];
-    let settings: Settings | null = null;
+    this.settings.clear();
+    this.legacySettings = null;
+    this.lastDeck = null;
     for (const record of meta) {
       if (record.key === 'studyDays') {
         studyDays = record.value;
       } else if (record.key === 'settings') {
-        settings = normalizeSettings(record.value);
+        this.legacySettings = normalizeSettings(record.value);
+      } else if (record.key === 'lastDeck') {
+        this.lastDeck = record.value;
+      } else if (record.key.startsWith(SETTINGS_KEY_PREFIX)) {
+        this.settings.set(
+          record.key.slice(SETTINGS_KEY_PREFIX.length),
+          normalizeSettings(record.value),
+        );
       }
     }
-    this.applyState({ stats, sessions, studyDays, settings });
+    this.applyState({ stats, sessions, studyDays });
   }
 
   /** セッションを始める（設計書 6.4 節の 2）。`sessions` にレコードを作り、そのセッションを返す。 */
   async startSession(input: StartSessionInput): Promise<Session> {
     const session: Session = {
       id: this.newId(),
+      deckId: input.deckId,
       mode: input.mode,
       pattern: input.pattern,
       range: input.range,
@@ -165,7 +193,8 @@ export class ProgressStore {
         sessionStore.get(input.sessionId),
         metaStore.get('studyDays'),
       ]);
-      const session = stored ?? this.sessions.get(input.sessionId);
+      const session =
+        stored === undefined ? this.sessions.get(input.sessionId) : normalizeSession(stored);
       if (session === undefined) {
         throw new Error(`セッション ${input.sessionId} が見つかりません`);
       }
@@ -221,7 +250,9 @@ export class ProgressStore {
     const tx = this.db.transaction('sessions', 'readwrite');
     const session = await inTransaction(tx, async () => {
       const store = tx.objectStore('sessions');
-      const current = (await store.get(sessionId)) ?? this.sessions.get(sessionId);
+      const stored = await store.get(sessionId);
+      const current =
+        stored === undefined ? this.sessions.get(sessionId) : normalizeSession(stored);
       if (current === undefined) {
         throw new Error(`セッション ${sessionId} が見つかりません`);
       }
@@ -235,21 +266,38 @@ export class ProgressStore {
     this.sessions.set(session.id, session);
   }
 
-  /** 最後に保存した出題設定。まだ無ければ `null`。 */
-  getSettings(): Settings | null {
-    return this.settings;
+  /**
+   * 教材 `deckId` の、最後に保存した出題設定。まだ無ければ `null`。
+   * 日本史年表（`LEGACY_DECK_ID`）は、教材ごとの設定が無ければ 1.0 の設定（`meta` の `settings`）を返す。
+   */
+  getSettings(deckId: string): Settings | null {
+    return this.settings.get(deckId) ?? (deckId === LEGACY_DECK_ID ? this.legacySettings : null);
   }
 
-  /** 出題設定を `meta.settings` に保存する。 */
-  async saveSettings(settings: Settings): Promise<void> {
+  /** 教材 `deckId` の出題設定を `meta` の `settings:<教材の id>` に保存する。 */
+  async saveSettings(deckId: string, settings: Settings): Promise<void> {
     const tx = this.db.transaction('meta', 'readwrite');
     await inTransaction(tx, async () => {
-      await tx.objectStore('meta').put({ key: 'settings', value: settings });
+      await tx.objectStore('meta').put({ key: settingsKey(deckId), value: settings });
     });
-    this.settings = settings;
+    this.settings.set(deckId, settings);
   }
 
-  /** 出来事 × パターンの集計。回答が無ければ `undefined`。 */
+  /** ホームで最後に選んだ教材の id。まだ無ければ `null`（今の教材に無い id のこともある）。 */
+  getLastDeck(): string | null {
+    return this.lastDeck;
+  }
+
+  /** ホームで選んだ教材の id を `meta` の `lastDeck` に保存する。 */
+  async saveLastDeck(deckId: string): Promise<void> {
+    const tx = this.db.transaction('meta', 'readwrite');
+    await inTransaction(tx, async () => {
+      await tx.objectStore('meta').put({ key: 'lastDeck', value: deckId });
+    });
+    this.lastDeck = deckId;
+  }
+
+  /** 項目 × パターンの集計。回答が無ければ `undefined`。 */
   getEventStats(eventId: string, pattern: Pattern): EventStats | undefined {
     return this.stats.get(statsKey(eventId, pattern));
   }
@@ -263,7 +311,7 @@ export class ProgressStore {
     return this.sessions.get(sessionId);
   }
 
-  /** 全てのセッション（開始時刻の古い順）。 */
+  /** 全教材のセッション（開始時刻の古い順）。 */
   listSessions(): Session[] {
     return [...this.sessions.values()].sort((a, b) => a.startedAt.localeCompare(b.startedAt));
   }
@@ -275,15 +323,19 @@ export class ProgressStore {
 
   /**
    * `attempts` の全件から、`eventStats`・`sessions` の `answered`・`correct`・`meta.studyDays` を再計算して
-   * 書き直す（設計書 5.4 節）。`sessions` の他の項目と出題設定はそのまま。メモリ上の状態も同じ内容にする。
+   * 書き直す（設計書 5.4 節）。`sessions` の他の項目、出題設定、最後に選んだ教材はそのまま。
+   * メモリ上の状態も同じ内容にする。
    */
   async rebuild(): Promise<void> {
     const tx = this.db.transaction(['attempts', 'eventStats', 'sessions', 'meta'], 'readwrite');
     const derived = await inTransaction(tx, () => rebuildInTransaction(tx, this.dateKey));
-    this.applyState({ ...derived, settings: this.settings });
+    this.applyState(derived);
   }
 
-  /** 書き出す内容（設計書 5.6 節）。`attempts` は全件を読む。 */
+  /**
+   * 書き出す内容（設計書 5.6 節。版 2）。全教材の記録を入れる。`attempts` は全件を読む。
+   * `deckId` の無いセッション（1.0 の記録）には `LEGACY_DECK_ID` を補って書き出す。
+   */
   async exportData(): Promise<ProgressExport> {
     const tx = this.db.transaction(['attempts', 'sessions'], 'readonly');
     const [attempts, sessions] = await inTransaction(tx, () =>
@@ -293,7 +345,7 @@ export class ProgressStore {
       schemaVersion: EXPORT_SCHEMA_VERSION,
       exportedAt: this.now().toISOString(),
       attempts,
-      sessions,
+      sessions: sessions.map(normalizeSession),
     };
   }
 
@@ -301,7 +353,7 @@ export class ProgressStore {
    * 書き出した内容で記録を全置換する（設計書 5.6 節）。形式を検証してから、1 つのトランザクションで
    * 全ストアを空にし、`sessions` と `attempts` を書き（`attempts` の `id` は捨てて自動採番に任せる）、
    * `rebuild()` と同じ再計算を行う。途中で失敗しても読み込み前の状態に戻るよう、再計算も同じトランザクションで行う。
-   * 出題設定も消える。メモリ上の状態も読み込んだ内容にする。
+   * 出題設定（教材ごと）と最後に選んだ教材も消える。メモリ上の状態も読み込んだ内容にする。
    * 形式が合わなければ何も変えずに、理由を入れた例外（`ImportFormatError`）を投げる。
    */
   async importData(data: unknown): Promise<void> {
@@ -325,10 +377,14 @@ export class ProgressStore {
       ]);
       return rebuildInTransaction(tx, this.dateKey);
     });
-    this.applyState({ ...derived, settings: null });
+    this.applyState(derived);
+    this.clearPreferences();
   }
 
-  /** 全ストアを空にし、メモリ上の状態も初期化する（設計書 5.6 節）。出題設定も消える。 */
+  /**
+   * 全ストアを空にし、メモリ上の状態も初期化する（設計書 5.6 節）。全教材の記録が消える。
+   * 出題設定（教材ごと）と最後に選んだ教材も消える。
+   */
   async reset(): Promise<void> {
     const tx = this.db.transaction(['attempts', 'eventStats', 'sessions', 'meta'], 'readwrite');
     await inTransaction(tx, async () => {
@@ -339,14 +395,14 @@ export class ProgressStore {
         tx.objectStore('meta').clear(),
       ]);
     });
-    this.applyState({ stats: [], sessions: [], studyDays: [], settings: null });
+    this.applyState({ stats: [], sessions: [], studyDays: [] });
+    this.clearPreferences();
   }
 
   private applyState(state: {
     stats: readonly EventStats[];
     sessions: readonly Session[];
     studyDays: readonly string[];
-    settings: Settings | null;
   }): void {
     this.stats.clear();
     for (const record of state.stats) {
@@ -357,13 +413,31 @@ export class ProgressStore {
       this.sessions.set(session.id, session);
     }
     this.studyDays = [...state.studyDays];
-    this.settings = state.settings;
   }
+
+  /** メモリ上の出題設定と最後に選んだ教材を消す（`meta` を空にしたとき）。 */
+  private clearPreferences(): void {
+    this.settings.clear();
+    this.legacySettings = null;
+    this.lastDeck = null;
+  }
+}
+
+/** 教材ごとの出題設定の `meta` の鍵の接頭辞。 */
+const SETTINGS_KEY_PREFIX = 'settings:';
+
+function settingsKey(deckId: string): SettingsKey {
+  return `${SETTINGS_KEY_PREFIX}${deckId}`;
 }
 
 /** 保存された出題設定を読む。`scope` が無い（PR 3 より前の）設定は `core` とみなす。 */
 function normalizeSettings(stored: StoredSettings): Settings {
   return { ...stored, scope: stored.scope === 'all' ? 'all' : 'core' };
+}
+
+/** 保存されたセッションを読む。`deckId` が無い（1.0 の）セッションは日本史年表（`LEGACY_DECK_ID`）とみなす。 */
+function normalizeSession(stored: StoredSession): Session {
+  return { ...stored, deckId: stored.deckId ?? LEGACY_DECK_ID };
 }
 
 /** `attempts` から再計算した派生データ。 */
@@ -432,7 +506,7 @@ async function rebuildInTransaction(
     tx.objectStore('attempts').getAll(),
     sessionStore.getAll(),
   ]);
-  const derived = deriveProgress(attempts, sessions, dateKey);
+  const derived = deriveProgress(attempts, sessions.map(normalizeSession), dateKey);
   await statsStore.clear();
   await Promise.all([
     ...derived.stats.map((record) => statsStore.put(record)),

@@ -13,6 +13,8 @@ interface SegmentedProps<T> {
   options: readonly SegmentedOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  /** 操作できなくする（ホームの教材の切り替えで、学習の記録を読み込んでいる間）。 */
+  disabled?: boolean;
 }
 
 /**
@@ -26,6 +28,7 @@ export function Segmented<T extends string | number>({
   options,
   value,
   onChange,
+  disabled = false,
 }: SegmentedProps<T>) {
   return (
     <fieldset className="field">
@@ -41,6 +44,7 @@ export function Segmented<T extends string | number>({
               className="overlay-input"
               name={name}
               checked={value === option.value}
+              disabled={disabled}
               onChange={() => onChange(option.value)}
             />
             <span className="segment-label">{option.label}</span>

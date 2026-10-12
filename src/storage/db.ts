@@ -6,15 +6,32 @@ const DB_NAME = 'qloop';
 export const DB_VERSION = 1;
 
 /**
+ * 1.0 の記録の教材の id。1.0 は日本史年表の 1 教材だけだったので、教材の id の無い記録（`deckId` の無いセッション、
+ * `meta` の `settings`、版 1 の書き出しファイル）はこの教材のものとして読む（設計書 5.4・5.6 節）。
+ */
+export const LEGACY_DECK_ID = 'japanese-history';
+
+/**
  * 保存された出題設定。PR 3 より前に保存したものには `scope` が無い（読み込むときに `core` とみなす）。
  */
 export type StoredSettings = Omit<Settings, 'scope'> & Partial<Pick<Settings, 'scope'>>;
 
+/** 教材ごとの出題設定の `meta` の鍵（`settings:<教材の id>`）。 */
+export type SettingsKey = `settings:${string}`;
+
 /** `meta` ストアのレコード。`key` で種類を分ける。 */
 type MetaRecord =
+  /** 教材ごとの出題設定。 */
+  | { key: SettingsKey; value: StoredSettings }
+  /** 1.0 の出題設定（年表のもの）。読むときだけ使う。 */
   | { key: 'settings'; value: StoredSettings }
-  /** 回答のあった端末ローカルの暦日（`YYYY-MM-DD`）。昇順で重複なし。 */
+  /** ホームで最後に選んだ教材の id。 */
+  | { key: 'lastDeck'; value: string }
+  /** 回答のあった端末ローカルの暦日（`YYYY-MM-DD`）。全教材で共通。昇順で重複なし。 */
   | { key: 'studyDays'; value: string[] };
+
+/** 保存されたセッション。1.0 の記録には `deckId` が無い（読むときに `LEGACY_DECK_ID` を補う）。 */
+export type StoredSession = Omit<Session, 'deckId'> & Partial<Pick<Session, 'deckId'>>;
 
 export interface QLoopSchema extends DBSchema {
   /** 回答の記録。追記のみで、成績の正本。 */
@@ -23,14 +40,14 @@ export interface QLoopSchema extends DBSchema {
     value: Attempt;
     indexes: { byEvent: string; byAnsweredAt: string; bySession: string };
   };
-  /** 出来事 × パターンの集計。`attempts` から再計算できる派生データ。 */
+  /** 項目 × パターンの集計。`attempts` から再計算できる派生データ。 */
   eventStats: {
     key: [string, Pattern];
     value: EventStats;
   };
   sessions: {
     key: string;
-    value: Session;
+    value: StoredSession;
   };
   meta: {
     key: MetaRecord['key'];

@@ -1,22 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import type { DateKeyFn } from './date';
+import { TIMELINE_RULES } from './decks';
 import type { Era, Event, EventStats, Pattern, Session } from './models';
 import { population } from './quiz';
 import {
   accuracyOf,
   describeSession,
-  eraStats,
-  eventRows,
   formatAccuracy,
-  formatRange,
+  groupStats,
   isInterrupted,
-  PATTERN_LABELS,
+  itemRows,
   sessionHistory,
-  sortEventRows,
+  sortItemRows,
   streakDays,
   summarizeStats,
-  type EventRow,
+  type ItemRow,
 } from './stats';
+
+/** テストの教材の id。 */
+const DECK_ID = 'japanese-history';
+
+/** 年表の項目別の成績（内訳は年表のパターンの順）。 */
+const rowsOf = (events: readonly Event[], stats: readonly EventStats[]) =>
+  itemRows(events, stats, TIMELINE_RULES.patterns);
 
 const HOUR = 60 * 60 * 1000;
 const JST: DateKeyFn = (date) => new Date(date.getTime() + 9 * HOUR).toISOString().slice(0, 10);
@@ -57,6 +63,7 @@ function st(
 function session(id: string, startedAt: string, extra: Partial<Session> = {}): Session {
   return {
     id,
+    deckId: DECK_ID,
     mode: 'normal',
     pattern: 'yearInput',
     range: { kind: 'all' },
@@ -69,7 +76,7 @@ function session(id: string, startedAt: string, extra: Partial<Session> = {}): S
   };
 }
 
-const ids = (rows: readonly EventRow[]) => rows.map((row) => row.event.id);
+const ids = (rows: readonly ItemRow[]) => rows.map((row) => row.item.id);
 
 describe('accuracyOf と formatAccuracy', () => {
   it('正答率は正解数 ÷ 回答数。回答数 0 は未回答', () => {
@@ -101,12 +108,14 @@ describe('summarizeStats', () => {
     session('b', '2026-10-11T00:00:00.000Z', { answered: 0, correct: 0 }),
   ];
   const summary = summarizeStats({
-    population: population({ events }),
+    deckId: DECK_ID,
+    population: population(events),
     stats,
     sessions,
     studyDays: ['2026-10-10', '2026-10-11'],
     now: new Date('2026-10-11T03:00:00.000Z'),
     dateKey: JST,
+    rules: TIMELINE_RULES,
   });
 
   it('全体は母集団の出来事の集計だけを合算する（パターンと通常・復習を合算した正解数 ÷ 回答数）', () => {
@@ -116,21 +125,21 @@ describe('summarizeStats', () => {
 
   it('時代別は母集団に出来事がある時代を時代区分表の順に並べ、回答数 0 の時代は未回答', () => {
     const eventsWithEmptyEra = [...events, ev('jh-0005', '明治'), ev('jh-0006', '飛鳥')];
-    const eras = eraStats(eventRows(population({ events: eventsWithEmptyEra }), stats));
+    const eras = groupStats(rowsOf(population(eventsWithEmptyEra), stats), TIMELINE_RULES);
     expect(eras).toEqual([
-      { era: '飛鳥', attempts: 0, correct: 0 },
-      { era: '奈良', attempts: 6, correct: 3 },
-      { era: '江戸', attempts: 4, correct: 3 },
-      { era: '明治', attempts: 0, correct: 0 },
+      { group: '飛鳥', attempts: 0, correct: 0 },
+      { group: '奈良', attempts: 6, correct: 3 },
+      { group: '江戸', attempts: 4, correct: 3 },
+      { group: '明治', attempts: 0, correct: 0 },
     ]);
     expect(formatAccuracy(eras[0])).toBe('未回答');
-    expect(summary.eras.map((era) => era.era)).toEqual(['奈良', '江戸']);
+    expect(summary.groups.map((era) => era.group)).toEqual(['奈良', '江戸']);
   });
 
   it('出来事別は母集団の出来事ごとに、回答数・正解数・最終回答日・パターン別の内訳を持つ', () => {
-    expect(summary.events).toEqual([
+    expect(summary.items).toEqual([
       {
-        event: events[0],
+        item: events[0],
         attempts: 6,
         correct: 3,
         lastAnsweredAt: '2026-10-11T00:00:00.000Z',
@@ -150,7 +159,7 @@ describe('summarizeStats', () => {
         ],
       },
       {
-        event: events[1],
+        item: events[1],
         attempts: 4,
         correct: 3,
         lastAnsweredAt: '2026-10-11T00:00:00.000Z',
@@ -163,7 +172,7 @@ describe('summarizeStats', () => {
           },
         ],
       },
-      { event: events[3], attempts: 0, correct: 0, lastAnsweredAt: null, patterns: [] },
+      { item: events[3], attempts: 0, correct: 0, lastAnsweredAt: null, patterns: [] },
     ]);
   });
 
@@ -172,9 +181,9 @@ describe('summarizeStats', () => {
   });
 });
 
-describe('eventRows', () => {
+describe('itemRows', () => {
   it('パターン別の内訳に年号 4 択も入り、年号入力・年号 4 択・出来事 4 択の順に並ぶ', () => {
-    const [row] = eventRows(
+    const [row] = rowsOf(
       [ev('a', '江戸')],
       [
         st('a', 'choice', 3, 1, '2026-10-11T03:00:00.000Z'),
@@ -195,13 +204,13 @@ describe('eventRows', () => {
       lastAnsweredAt: '2026-10-11T03:00:00.000Z',
     });
     // 年号 4 択だけに回答した出来事も、その内訳だけで集計する
-    const [only] = eventRows([ev('b', '江戸')], [st('b', 'yearChoice', 4, 3)]);
+    const [only] = rowsOf([ev('b', '江戸')], [st('b', 'yearChoice', 4, 3)]);
     expect(only.patterns.map((pattern) => pattern.pattern)).toEqual(['yearChoice']);
     expect(only).toMatchObject({ attempts: 4, correct: 3 });
   });
 
   it('最終回答日はパターンのうち新しい方', () => {
-    const [row] = eventRows(
+    const [row] = rowsOf(
       [ev('a', '江戸')],
       [
         st('a', 'yearInput', 1, 1, '2026-10-12T00:00:00.000Z'),
@@ -212,7 +221,7 @@ describe('eventRows', () => {
   });
 });
 
-describe('sortEventRows', () => {
+describe('sortItemRows', () => {
   const events = ['e5', 'e1', 'e4', 'e2', 'e3', 'e6', 'e7'].map((id) => ev(id, '江戸'));
   const stats = [
     st('e5', 'yearInput', 4, 1, '2026-10-05T00:00:00.000Z'), // 25%
@@ -222,38 +231,22 @@ describe('sortEventRows', () => {
     st('e3', 'choice', 1, 0, '2026-10-02T00:00:00.000Z'), // 0%
   ];
   // e6・e7 は未回答
-  const rows = eventRows(events, stats);
+  const rows = rowsOf(events, stats);
 
   it('既定は正答率の低い順。同じ正答率は id 順、未回答は回答済みの後ろに id 順', () => {
-    expect(ids(sortEventRows(rows, 'accuracy'))).toEqual([
-      'e3',
-      'e5',
-      'e1',
-      'e4',
-      'e2',
-      'e6',
-      'e7',
-    ]);
+    expect(ids(sortItemRows(rows, 'accuracy'))).toEqual(['e3', 'e5', 'e1', 'e4', 'e2', 'e6', 'e7']);
   });
 
   it('回答数の多い順。同じ回答数は id 順', () => {
-    expect(ids(sortEventRows(rows, 'attempts'))).toEqual([
-      'e4',
-      'e5',
-      'e2',
-      'e1',
-      'e3',
-      'e6',
-      'e7',
-    ]);
+    expect(ids(sortItemRows(rows, 'attempts'))).toEqual(['e4', 'e5', 'e2', 'e1', 'e3', 'e6', 'e7']);
   });
 
   it('最終回答日の新しい順。同じ日時は id 順、未回答は後ろ', () => {
-    expect(ids(sortEventRows(rows, 'recent'))).toEqual(['e2', 'e4', 'e5', 'e3', 'e1', 'e6', 'e7']);
+    expect(ids(sortItemRows(rows, 'recent'))).toEqual(['e2', 'e4', 'e5', 'e3', 'e1', 'e6', 'e7']);
   });
 
   it('元の配列の並びは変えない', () => {
-    sortEventRows(rows, 'accuracy');
+    sortItemRows(rows, 'accuracy');
     expect(ids(rows)).toEqual(['e5', 'e1', 'e4', 'e2', 'e3', 'e6', 'e7']);
   });
 });
@@ -281,12 +274,14 @@ describe('streakDays', () => {
 
   it('今日は注入した暦で決める（UTC では前日でも、JST では今日）', () => {
     const input = {
+      deckId: DECK_ID,
       population: [],
       stats: [],
       sessions: [],
       studyDays: ['2026-10-12'],
       // JST の 10 月 12 日 0:30（UTC では 10 月 11 日 15:30）
       now: new Date('2026-10-11T15:30:00.000Z'),
+      rules: TIMELINE_RULES,
     };
     expect(summarizeStats({ ...input, dateKey: JST }).overall.streakDays).toBe(1);
     // UTC の暦では今日が 10 月 11 日で、10 月 12 日は数えない
@@ -305,45 +300,47 @@ describe('sessionHistory', () => {
       session('same-b', '2026-10-03T00:00:00.000Z'),
       session('same-a', '2026-10-03T00:00:00.000Z'),
     ];
-    const history = sessionHistory(sessions);
+    const history = sessionHistory(sessions, DECK_ID);
     expect(history.map((s) => s.id)).toEqual(['new', 'interrupted', 'same-a', 'same-b', 'old']);
     expect(history.map(isInterrupted)).toEqual([false, true, false, false, false]);
   });
+
+  it('選んだ教材（deckId）のセッションだけを出す', () => {
+    const sessions = [
+      session('history', '2026-10-01T00:00:00.000Z'),
+      session('other', '2026-10-02T00:00:00.000Z', { deckId: 'other-deck' }),
+    ];
+    expect(sessionHistory(sessions, DECK_ID).map((s) => s.id)).toEqual(['history']);
+    expect(sessionHistory(sessions, 'other-deck').map((s) => s.id)).toEqual(['other']);
+  });
 });
 
-describe('formatRange と describeSession', () => {
-  it('範囲を表示用の文字列にする', () => {
-    expect(formatRange({ kind: 'all' })).toBe('全範囲');
-    expect(formatRange({ kind: 'years', from: 700, to: 1600 })).toBe('700年〜1600年');
-    expect(formatRange({ kind: 'years', from: 700, to: null })).toBe('700年〜');
-    expect(formatRange({ kind: 'years', from: null, to: 1600 })).toBe('〜1600年');
-    expect(formatRange({ kind: 'years', from: null, to: null })).toBe('全範囲');
-    expect(formatRange({ kind: 'eras', eras: ['奈良', '江戸'] })).toBe('奈良・江戸');
-  });
-
+describe('describeSession', () => {
   it('履歴の内容はモード・範囲・パターン。復習はモードだけ', () => {
     expect(
-      describeSession({
-        mode: 'normal',
-        range: { kind: 'years', from: 700, to: 1600 },
-        pattern: 'mixed',
-      }),
+      describeSession(
+        {
+          mode: 'normal',
+          range: { kind: 'years', from: 700, to: 1600 },
+          pattern: 'mixed',
+        },
+        TIMELINE_RULES,
+      ),
     ).toBe('通常 · 700年〜1600年 · ミックス');
-    expect(describeSession({ mode: 'normal', range: { kind: 'all' }, pattern: 'choice' })).toBe(
-      '通常 · 全範囲 · 出来事 4 択',
+    expect(
+      describeSession(
+        { mode: 'normal', range: { kind: 'all' }, pattern: 'choice' },
+        TIMELINE_RULES,
+      ),
+    ).toBe('通常 · 全範囲 · 出来事 4 択');
+    expect(
+      describeSession(
+        { mode: 'normal', range: { kind: 'all' }, pattern: 'yearChoice' },
+        TIMELINE_RULES,
+      ),
+    ).toBe('通常 · 全範囲 · 年号 4 択');
+    expect(describeSession({ mode: 'review', range: null, pattern: null }, TIMELINE_RULES)).toBe(
+      '復習',
     );
-    expect(describeSession({ mode: 'normal', range: { kind: 'all' }, pattern: 'yearChoice' })).toBe(
-      '通常 · 全範囲 · 年号 4 択',
-    );
-    expect(describeSession({ mode: 'review', range: null, pattern: null })).toBe('復習');
-  });
-
-  it('パターンの表示名は 年号入力・年号 4 択・出来事 4 択・ミックス', () => {
-    expect(PATTERN_LABELS).toEqual({
-      yearInput: '年号入力',
-      yearChoice: '年号 4 択',
-      choice: '出来事 4 択',
-      mixed: 'ミックス',
-    });
   });
 });

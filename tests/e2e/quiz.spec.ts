@@ -179,7 +179,7 @@ test('年号入力で正解と不正解を 1 問ずつ答えて終了すると�
 test('出題する出来事は既定が基本の年表のみで、すべてを選ぶと追加データも対象になる', async ({
   page,
 }) => {
-  // pool.csv の行の有無によらないよう、件数は deck.json から数える
+  // pool.csv の行の有無によらないよう、件数は decks.json から数える
   const targets = populationOf(readDeckEvents()).filter(isYearInputEligible);
   const coreCount = targets.filter((event) => event.role === 'core').length;
   await openSetup(page);

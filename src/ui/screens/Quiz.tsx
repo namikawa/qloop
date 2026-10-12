@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { Event, Pattern, Question, Session } from '../../core/models';
+import type { Event, Question, Session } from '../../core/models';
 import { answeredRatio, progressSteps, type AnswerOutcome } from '../../core/progress';
 import { isCorrectYear } from '../../core/quiz';
 import {
@@ -16,8 +16,8 @@ import { ProgressSteps, ProgressTrack } from '../components/ProgressSteps';
 
 /** 回答した 1 問（まとめ画面に渡す）。 */
 export interface AnsweredQuestion {
-  event: Event;
-  pattern: Pattern;
+  item: Question['item'];
+  pattern: Question['pattern'];
   /** 判定。「わからない」は記録では不正解だが、進み具合の区切りでは分けて示す。 */
   outcome: AnswerOutcome;
 }
@@ -34,6 +34,7 @@ export interface QuizResult {
 /**
  * 判定の結果。`chosen` は選んだ選択肢（出来事 4 択は出来事の id、年号 4 択は年。年号入力は `null`）。
  * `gaveUp` は「わからない」を押したとき（記録は不正解で、`chosen` は `null`）。
+ * 判定と記録は教材の種類によらず共通で、問題の部品（`QuestionBody`）が `correct` と `chosen` を決める。
  */
 interface Judgement {
   correct: boolean;
@@ -65,7 +66,8 @@ interface QuizProps {
 
 /**
  * 出題の画面（設計書 6.2〜6.4 節・6.7 節）。1 問ごとに 判定 → 保存 → 表示 の順で進める。
- * 保存に失敗しても帯で知らせて続けられるようにする。
+ * 保存に失敗しても帯で知らせて続けられるようにする。画面の形は教材によらず共通で、問題の部品（`QuestionBody`）と
+ * 判定の帯の補足（`JudgementDetail`）だけが問題のパターン（教材の種類）で変わる（設計書 6.9 節）。
  */
 export function Quiz({ store, session, questions, onFinish }: QuizProps) {
   const [index, setIndex] = useState(0);
@@ -99,7 +101,7 @@ export function Quiz({ store, session, questions, onFinish }: QuizProps) {
     try {
       await store.recordAnswer({
         sessionId: session.id,
-        eventId: question.event.id,
+        eventId: question.item.id,
         pattern: question.pattern,
         correct,
         endSession: isLast,
@@ -116,7 +118,7 @@ export function Quiz({ store, session, questions, onFinish }: QuizProps) {
     const next: Judgement = { correct, chosen, gaveUp };
     setAnswers((previous) => [
       ...previous,
-      { event: question.event, pattern: question.pattern, outcome: outcomeOf(next) },
+      { item: question.item, pattern: question.pattern, outcome: outcomeOf(next) },
     ]);
     setJudgement(next);
   };
@@ -177,35 +179,13 @@ export function Quiz({ store, session, questions, onFinish }: QuizProps) {
       )}
 
       <main className="quiz screen-body" key={index}>
-        {question.pattern === 'yearInput' && (
-          <YearInputQuestion
-            event={question.event}
-            outcome={outcome}
-            disabled={saving || ending}
-            onAnswer={(year) => void answer(isCorrectYear(question.event, year), null)}
-            onGiveUp={giveUp}
-          />
-        )}
-        {question.pattern === 'yearChoice' && (
-          <YearChoiceQuestion
-            event={question.event}
-            years={question.years}
-            judgement={judgement}
-            disabled={saving || ending}
-            onAnswer={(year) => void answer(year === question.event.year, year)}
-            onGiveUp={giveUp}
-          />
-        )}
-        {question.pattern === 'choice' && (
-          <ChoiceQuestion
-            event={question.event}
-            choices={question.choices}
-            judgement={judgement}
-            disabled={saving || ending}
-            onAnswer={(choice) => void answer(choice.id === question.event.id, choice.id)}
-            onGiveUp={giveUp}
-          />
-        )}
+        <QuestionBody
+          question={question}
+          judgement={judgement}
+          disabled={saving || ending}
+          onAnswer={(correct, chosen) => void answer(correct, chosen)}
+          onGiveUp={giveUp}
+        />
       </main>
 
       {outcome !== null && (
@@ -219,12 +199,7 @@ export function Quiz({ store, session, questions, onFinish }: QuizProps) {
                 <JudgementIcon kind={outcome} />
                 {JUDGEMENT_MARKS[outcome].text}
               </p>
-              {question.pattern !== 'choice' && (
-                <p className="judgement-detail">
-                  正解の年{' '}
-                  <span className="judgement-years">{formatAnswerYears(question.event)}</span>
-                </p>
-              )}
+              <JudgementDetail question={question} />
             </div>
             <button
               type="button"
@@ -251,6 +226,68 @@ export function Quiz({ store, session, questions, onFinish }: QuizProps) {
         </ConfirmDialog>
       )}
     </div>
+  );
+}
+
+interface QuestionBodyProps {
+  question: Question;
+  /** 判定。回答前は `null`。 */
+  judgement: Judgement | null;
+  disabled: boolean;
+  /** 回答したとき。`chosen` は選んだ選択肢（`Judgement` の `chosen`）。 */
+  onAnswer: (correct: boolean, chosen: string | number | null) => void;
+  onGiveUp: () => void;
+}
+
+/** 問題の部品。問題のパターンで振り分ける（年表は年号入力・年号 4 択・出来事 4 択）。 */
+function QuestionBody({ question, judgement, disabled, onAnswer, onGiveUp }: QuestionBodyProps) {
+  switch (question.pattern) {
+    case 'yearInput':
+      return (
+        <YearInputQuestion
+          event={question.item}
+          outcome={judgement === null ? null : outcomeOf(judgement)}
+          disabled={disabled}
+          onAnswer={(year) => onAnswer(isCorrectYear(question.item, year), null)}
+          onGiveUp={onGiveUp}
+        />
+      );
+    case 'yearChoice':
+      return (
+        <YearChoiceQuestion
+          event={question.item}
+          years={question.years}
+          judgement={judgement}
+          disabled={disabled}
+          onAnswer={(year) => onAnswer(year === question.item.year, year)}
+          onGiveUp={onGiveUp}
+        />
+      );
+    case 'choice':
+      return (
+        <ChoiceQuestion
+          event={question.item}
+          choices={question.choices}
+          judgement={judgement}
+          disabled={disabled}
+          onAnswer={(choice) => onAnswer(choice.id === question.item.id, choice.id)}
+          onGiveUp={onGiveUp}
+        />
+      );
+  }
+}
+
+/**
+ * 判定の帯の補足。年号入力と年号 4 択は正解の年（別解を併記）を出す。出来事 4 択は選択肢の強調で正解を示すので出さない。
+ */
+function JudgementDetail({ question }: { question: Question }) {
+  if (question.pattern === 'choice') {
+    return null;
+  }
+  return (
+    <p className="judgement-detail">
+      正解の年 <span className="judgement-years">{formatAnswerYears(question.item)}</span>
+    </p>
   );
 }
 

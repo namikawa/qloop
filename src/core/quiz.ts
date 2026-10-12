@@ -1,12 +1,12 @@
 import {
-  PATTERNS,
-  type Deck,
+  TIMELINE_PATTERNS,
   type Event,
   type EventScope,
-  type Pattern,
-  type PatternMode,
-  type Question,
+  type Item,
   type QuestionCount,
+  type TimelinePattern,
+  type TimelinePatternMode,
+  type TimelineQuestion,
 } from './models';
 import { randomInt, shuffle, type Rng } from './random';
 
@@ -23,19 +23,20 @@ const APPROX_EXCLUSION_YEARS = 50;
 const CHOICE_NEAR_YEARS = 100;
 
 /**
- * 出題の母集団（設計書 6.1 節の 1）: `level` が `中学` の出来事（`core.csv` と `pool.csv` の両方）。
+ * 出題の母集団（設計書 6.1 節の 1）: `level` が `中学` の項目（`core.csv` と `pool.csv` の両方）。
  * `高校` の行は誤答の候補にだけ使う。復習と成績は出題設定によらずこの母集団全体を対象にする。
+ * 教材の種類によらず同じ規則（語彙も同じ。設計書 6.8 節の 1）。
  */
-export function population(deck: Pick<Deck, 'events'>): Event[] {
-  return deck.events.filter((event) => event.level === '中学');
+export function population<I extends Item>(items: readonly I[]): I[] {
+  return items.filter((item) => item.level === '中学');
 }
 
 /**
  * 出題設定の「出題する出来事」で絞り込む（設計書 6.1 節の 1）。
- * `core` は基本の年表（`core.csv` の行）だけ、`all` は絞り込まない。範囲の指定より先に適用する。
+ * `core` は基本データ（`core.csv` の行）だけ、`all` は絞り込まない。範囲の指定より先に適用する。
  */
-export function filterByScope(events: readonly Event[], scope: EventScope): Event[] {
-  return scope === 'core' ? events.filter((event) => event.role === 'core') : [...events];
+export function filterByScope<I extends Item>(items: readonly I[], scope: EventScope): I[] {
+  return scope === 'core' ? items.filter((item) => item.role === 'core') : [...items];
 }
 
 /** 年号入力に出せるか（設計書 6.1 節の 3）: `approx` でなく、`year` が正の出来事。 */
@@ -54,7 +55,7 @@ export function isYearChoiceEligible(event: Event): boolean {
  */
 export function isEligibleFor(
   event: Event,
-  pattern: Pattern,
+  pattern: TimelinePattern,
   allEvents: readonly Event[],
 ): boolean {
   switch (pattern) {
@@ -71,10 +72,10 @@ export function isEligibleFor(
 export interface EligibleEvent {
   event: Event;
   /**
-   * 使えるパターン（1〜3 件。`PATTERNS` の順）。2 件以上（ミックスで複数に適格）なら、
+   * 使えるパターン（1〜3 件。`TIMELINE_PATTERNS` の順）。2 件以上（ミックスで複数に適格）なら、
    * 問題を作るときに 1 問ごとに等確率で選ぶ。
    */
-  patterns: Pattern[];
+  patterns: TimelinePattern[];
 }
 
 /**
@@ -89,9 +90,9 @@ export interface EligibleEvent {
 export function eligibleQuestions(
   candidates: readonly Event[],
   allEvents: readonly Event[],
-  mode: PatternMode,
+  mode: TimelinePatternMode,
 ): EligibleEvent[] {
-  const modes: readonly Pattern[] = mode === 'mixed' ? PATTERNS : [mode];
+  const modes: readonly TimelinePattern[] = mode === 'mixed' ? TIMELINE_PATTERNS : [mode];
   const result: EligibleEvent[] = [];
   const seen = new Set<string>();
   for (const event of candidates) {
@@ -133,7 +134,7 @@ export interface GenerateSessionInput {
   candidates: readonly Event[];
   /** 出来事 4 択の誤答の候補に使う core と pool の全出来事。 */
   allEvents: readonly Event[];
-  mode: PatternMode;
+  mode: TimelinePatternMode;
   count: QuestionCount;
   /** 今年（端末の現在の暦年）。年号 4 択の誤答から、これより後の年を除く。 */
   currentYear: number;
@@ -152,7 +153,7 @@ export function generateSession({
   count,
   currentYear,
   rng,
-}: GenerateSessionInput): Question[] {
+}: GenerateSessionInput): TimelineQuestion[] {
   const eligible = shuffle(eligibleQuestions(candidates, allEvents, mode), rng);
   const size = count === 'all' ? eligible.length : Math.min(count, eligible.length);
   return eligible
@@ -168,18 +169,18 @@ export function generateSession({
  */
 export function buildQuestion(
   event: Event,
-  pattern: Pattern,
+  pattern: TimelinePattern,
   allEvents: readonly Event[],
   currentYear: number,
   rng: Rng,
-): Question {
+): TimelineQuestion {
   switch (pattern) {
     case 'yearInput':
-      return { event, pattern };
+      return { item: event, pattern };
     case 'yearChoice':
-      return { event, pattern, years: generateYearChoices(event, currentYear, rng) };
+      return { item: event, pattern, years: generateYearChoices(event, currentYear, rng) };
     case 'choice':
-      return { event, pattern, choices: generateChoices(event, allEvents, rng) };
+      return { item: event, pattern, choices: generateChoices(event, allEvents, rng) };
   }
 }
 

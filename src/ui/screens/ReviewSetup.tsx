@@ -1,51 +1,73 @@
 import { useState } from 'react';
-import type { Event, Question, QuestionCount, Session } from '../../core/models';
-import { generateReviewSession, reviewCandidates } from '../../core/review';
+import type { Item, Pattern, Question, QuestionCount, Session } from '../../core/models';
+import { generateReviewSession, reviewCandidates, type ReviewRules } from '../../core/review';
 import type { ProgressStore } from '../../storage/progress-store';
 import { BottomBar } from '../components/BottomBar';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { Segmented } from '../components/Segmented';
 import { COUNT_OPTIONS } from './QuizSetup';
 
-interface ReviewSetupProps {
+interface ReviewSetupProps<I extends Item, P extends Pattern> {
   store: ProgressStore;
-  /** 出題の母集団（復習は「出題する出来事」の設定によらず母集団全体を対象にする）。 */
-  population: readonly Event[];
-  /** 出来事 4 択の適格判定と誤答の候補に使う全出来事。 */
-  allEvents: readonly Event[];
+  /** 選んだ教材の id。 */
+  deckId: string;
+  /** 見出しの下に出す教材の名前（教材が 1 つのときは無し）。 */
+  deckName?: string;
+  /** 選んだ教材の母集団（復習は「出題する項目」の設定によらず母集団全体を対象にする）。 */
+  population: readonly I[];
+  /** 4 択の適格判定と誤答の候補に使う、その教材の全項目。 */
+  allItems: readonly I[];
+  /** その教材の種類の差分。 */
+  rules: ReviewRules<I, P>;
   onStart: (session: Session, questions: Question[]) => void;
   onBack: () => void;
 }
 
 /**
- * 復習の設定画面（設計書 7 章）。設定は問題数だけ。候補が 0 件なら開始できない。
+ * 復習の設定画面（設計書 7 章）。選んだ教材の復習を行う。設定は問題数だけ。候補が 0 件なら開始できない。
  * 候補と重みは「開始」を押したときに確定し、問題列を作って出題の画面へ進む。
  */
-export function ReviewSetup({ store, population, allEvents, onStart, onBack }: ReviewSetupProps) {
+export function ReviewSetup<I extends Item, P extends Pattern>({
+  store,
+  deckId,
+  deckName,
+  population,
+  allItems,
+  rules,
+  onStart,
+  onBack,
+}: ReviewSetupProps<I, P>) {
   const [candidateCount, setCandidateCount] = useState(
     () =>
-      reviewCandidates({ population, allEvents, stats: store.listEventStats(), now: new Date() })
-        .length,
+      reviewCandidates({
+        population,
+        allItems,
+        stats: store.listEventStats(),
+        now: new Date(),
+        rules,
+      }).length,
   );
   const [count, setCount] = useState<QuestionCount>(10);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
 
   const handleStart = async () => {
-    // 候補と重み、年号 4 択と出来事 4 択の選択肢はセッション開始時に確定する
+    // 候補と重み、4 択の選択肢はセッション開始時に確定する
     const now = new Date();
     const candidates = reviewCandidates({
       population,
-      allEvents,
+      allItems,
       stats: store.listEventStats(),
       now,
+      rules,
     });
     const questions = generateReviewSession({
       candidates,
-      allEvents,
+      allItems,
       count,
       currentYear: now.getFullYear(),
       rng: Math.random,
+      rules,
     });
     if (questions.length === 0) {
       setCandidateCount(0);
@@ -55,6 +77,7 @@ export function ReviewSetup({ store, population, allEvents, onStart, onBack }: R
     setStartError(null);
     try {
       const session = await store.startSession({
+        deckId,
         mode: 'review',
         pattern: null,
         range: null,
@@ -69,7 +92,7 @@ export function ReviewSetup({ store, population, allEvents, onStart, onBack }: R
 
   return (
     <div className="screen screen-with-bar">
-      <ScreenHeader title="復習" onBack={onBack} />
+      <ScreenHeader title="復習" deckName={deckName} onBack={onBack} />
 
       <main className="setup screen-body">
         <section className="card review-card" aria-labelledby="review-card-label">

@@ -1,19 +1,18 @@
 import { useId, useState } from 'react';
+import type { TimelineDeckModel } from '../../core/decks';
 import { ERAS } from '../../core/era';
 import type {
   Era,
-  Event,
   EventScope,
-  PatternMode,
   Question,
   QuestionCount,
   Range,
   Session,
   Settings,
+  TimelinePatternMode,
 } from '../../core/models';
 import { eligibleQuestions, filterByScope, generateSession } from '../../core/quiz';
 import { filterByRange, parseRangeYear, validateRange } from '../../core/range';
-import { PATTERN_LABELS } from '../../core/stats';
 import type { ProgressStore } from '../../storage/progress-store';
 import { BottomBar } from '../components/BottomBar';
 import { CheckCircleIcon, CheckIcon } from '../components/icons';
@@ -30,27 +29,13 @@ const DEFAULT_SETTINGS: Settings = {
   range: { kind: 'all' },
 };
 
-const SCOPE_OPTIONS: { value: EventScope; label: string }[] = [
-  { value: 'core', label: '基本の年表のみ' },
-  { value: 'all', label: 'すべて' },
-];
-
 /** 出題パターンの説明。 */
-const PATTERN_DESCRIPTIONS: Readonly<Record<PatternMode, string>> = {
+const PATTERN_DESCRIPTIONS: Readonly<Record<TimelinePatternMode, string>> = {
   yearInput: '年を数字で入れる',
   yearChoice: '4 つの年から選ぶ',
   choice: '4 つの出来事から選ぶ',
   mixed: '3 つの形式をまぜる',
 };
-
-/** 出題パターンの選択肢（年号入力・年号 4 択・出来事 4 択・ミックスの順。表示名は `PATTERN_LABELS`）。 */
-const PATTERN_OPTIONS: { value: PatternMode; label: string; description: string }[] = (
-  ['yearInput', 'yearChoice', 'choice', 'mixed'] as const
-).map((value) => ({
-  value,
-  label: PATTERN_LABELS[value],
-  description: PATTERN_DESCRIPTIONS[value],
-}));
 
 /** 問題数の選択肢（出題設定と復習で共通）。 */
 export const COUNT_OPTIONS: { value: QuestionCount; label: string }[] = [
@@ -67,19 +52,34 @@ const RANGE_OPTIONS: { value: Range['kind']; label: string }[] = [
 
 interface QuizSetupProps {
   store: ProgressStore;
-  /** 出題の母集団（「出題する出来事」で絞り込む前のもの）。 */
-  population: readonly Event[];
-  /** 誤答の候補に使う全出来事。 */
-  allEvents: readonly Event[];
+  /** 選んだ教材（年表）。母集団は「出題する出来事」で絞り込む前のもの、全項目は誤答の候補に使う。 */
+  model: TimelineDeckModel;
+  /** 見出しの下に出す教材の名前（教材が 1 つのときは無し）。 */
+  deckName?: string;
   onStart: (session: Session, questions: Question[]) => void;
   onBack: () => void;
 }
 
-/** 出題設定の画面（設計書 6.1 節・6.4 節の 1）。出題する出来事・パターン・問題数・範囲を選んで開始する。 */
-export function QuizSetup({ store, population, allEvents, onStart, onBack }: QuizSetupProps) {
-  const [initial] = useState(() => store.getSettings() ?? DEFAULT_SETTINGS);
+/**
+ * 年表の出題設定の画面（設計書 6.1 節・6.4 節の 1）。出題する出来事・パターン・問題数・範囲を選んで開始する。
+ * 設定は教材ごとに保存する。
+ */
+export function QuizSetup({ store, model, deckName, onStart, onBack }: QuizSetupProps) {
+  const { deck, rules, population } = model;
+  const allEvents = deck.items;
+  const scopeOptions: { value: EventScope; label: string }[] = [
+    { value: 'core', label: `${rules.labels.core}のみ` },
+    { value: 'all', label: 'すべて' },
+  ];
+  // 年号入力・年号 4 択・出来事 4 択・ミックスの順
+  const patternOptions = [...rules.patterns, 'mixed' as const].map((value) => ({
+    value,
+    label: rules.patternLabel(value),
+    description: PATTERN_DESCRIPTIONS[value],
+  }));
+  const [initial] = useState(() => store.getSettings(deck.id) ?? DEFAULT_SETTINGS);
   const [scope, setScope] = useState<EventScope>(initial.scope);
-  const [pattern, setPattern] = useState<PatternMode>(initial.pattern);
+  const [pattern, setPattern] = useState<TimelinePatternMode>(initial.pattern);
   const [count, setCount] = useState<QuestionCount>(initial.count);
   const [rangeKind, setRangeKind] = useState<Range['kind']>(initial.range.kind);
   // 範囲の種類を切り替えても、年と時代の入力は残しておく
@@ -154,8 +154,9 @@ export function QuizSetup({ store, population, allEvents, onStart, onBack }: Qui
     setStarting(true);
     setStartError(null);
     try {
-      await store.saveSettings({ scope, pattern, count, range });
+      await store.saveSettings(deck.id, { scope, pattern, count, range });
       const session = await store.startSession({
+        deckId: deck.id,
         mode: 'normal',
         pattern,
         range,
@@ -170,18 +171,18 @@ export function QuizSetup({ store, population, allEvents, onStart, onBack }: Qui
 
   return (
     <div className="screen screen-with-bar">
-      <ScreenHeader title="出題設定" onBack={onBack} />
+      <ScreenHeader title="出題設定" deckName={deckName} onBack={onBack} />
 
       <main className="setup screen-body">
         <Segmented
-          legend="出題する出来事"
+          legend={`出題する${rules.labels.item}`}
           name="scope"
-          options={SCOPE_OPTIONS}
+          options={scopeOptions}
           value={scope}
           onChange={setScope}
         />
 
-        <PatternField value={pattern} onChange={setPattern} />
+        <PatternField options={patternOptions} value={pattern} onChange={setPattern} />
 
         <Segmented
           legend="問題数"
@@ -285,20 +286,21 @@ export function QuizSetup({ store, population, allEvents, onStart, onBack }: Qui
 }
 
 interface PatternFieldProps {
-  value: PatternMode;
-  onChange: (value: PatternMode) => void;
+  options: readonly { value: TimelinePatternMode; label: string; description: string }[];
+  value: TimelinePatternMode;
+  onChange: (value: TimelinePatternMode) => void;
 }
 
 /**
  * 出題パターンの選択（2 列のカード）。ラジオボタンの名前はパターン名だけにし、説明は aria-describedby で添える。
  */
-function PatternField({ value, onChange }: PatternFieldProps) {
+function PatternField({ options, value, onChange }: PatternFieldProps) {
   const idPrefix = useId();
   return (
     <fieldset className="field">
       <legend className="field-legend">出題パターン</legend>
       <div className="pattern-options">
-        {PATTERN_OPTIONS.map((option) => {
+        {options.map((option) => {
           const inputId = `${idPrefix}-${option.value}`;
           const descriptionId = `${inputId}-description`;
           return (

@@ -7,7 +7,8 @@ import {
   type ProgressExport,
 } from './transfer';
 
-const VALID: ProgressExport = {
+/** 版 1（1.0）の書き出しファイルの例。`sessions` に `deckId` が無い。 */
+const VALID_V1 = {
   schemaVersion: 1,
   exportedAt: '2026-10-11T01:00:00.000Z',
   attempts: [
@@ -46,6 +47,16 @@ const VALID: ProgressExport = {
   ],
 };
 
+/** 版 2 の書き出しファイルの例（版 1 の例の各セッションに `deckId` を足したもの）。 */
+const VALID = {
+  ...VALID_V1,
+  schemaVersion: 2,
+  sessions: [
+    { ...VALID_V1.sessions[0], deckId: 'japanese-history' },
+    { ...VALID_V1.sessions[1], deckId: 'japanese-history' },
+  ],
+} as ProgressExport;
+
 /** VALID を複製し、`edit` で一部を書き換えたもの。 */
 function variant(edit: (data: Record<string, unknown>) => void): unknown {
   const data = structuredClone(VALID) as unknown as Record<string, unknown>;
@@ -69,6 +80,35 @@ describe('parseProgressExport', () => {
       ...VALID,
       attempts: [attempt],
     });
+  });
+
+  it('版 1（1.0）のファイルも受け付け、セッションに deckId（日本史年表）を補って版 2 の形にする', () => {
+    const attempt = { ...VALID.attempts[0] };
+    delete attempt.id;
+    const parsed = parseProgressExport(structuredClone(VALID_V1));
+    expect(parsed).toEqual({ ...VALID, attempts: [attempt] });
+    expect(parsed.sessions.map((session) => session.deckId)).toEqual([
+      'japanese-history',
+      'japanese-history',
+    ]);
+  });
+
+  it('版 1 のファイルのセッションの deckId は読まずに日本史年表とみなす', () => {
+    const data = structuredClone(VALID_V1) as unknown as Record<string, unknown>;
+    firstSession(data).deckId = 'other-deck';
+    expect(parseProgressExport(data).sessions[0].deckId).toBe('japanese-history');
+  });
+
+  it('版 2 のファイルの deckId は、今の教材に無い id もそのまま保つ', () => {
+    const parsed = parseProgressExport(
+      variant((data) => {
+        firstSession(data).deckId = 'unknown-deck';
+      }),
+    );
+    expect(parsed.sessions.map((session) => session.deckId)).toEqual([
+      'unknown-deck',
+      'japanese-history',
+    ]);
   });
 
   it('知らない項目は取り除く', () => {
@@ -126,18 +166,25 @@ describe('parseProgressExport', () => {
 
   it.each<[string, (data: Record<string, unknown>) => void, RegExp]>([
     [
-      'schemaVersion が 1 でない',
+      'schemaVersion が 1 でも 2 でもない',
       (data) => {
-        data.schemaVersion = 2;
+        data.schemaVersion = 3;
       },
-      /schemaVersion が 1 ではありません（2）/,
+      /schemaVersion が 1 か 2 ではありません（3）/,
+    ],
+    [
+      'schemaVersion が文字列',
+      (data) => {
+        data.schemaVersion = '2';
+      },
+      /schemaVersion が 1 か 2 ではありません（"2"）/,
     ],
     [
       'schemaVersion が無い',
       (data) => {
         delete data.schemaVersion;
       },
-      /schemaVersion が 1 ではありません（項目がありません）/,
+      /schemaVersion が 1 か 2 ではありません（項目がありません）/,
     ],
     [
       'exportedAt が日時でない',
@@ -208,6 +255,27 @@ describe('parseProgressExport', () => {
         firstAttempt(data).id = 'a';
       },
       /attempts の 1 件目: id が不正です/,
+    ],
+    [
+      '版 2 の sessions の deckId が無い',
+      (data) => {
+        delete firstSession(data).deckId;
+      },
+      /sessions の 1 件目: deckId が不正です（項目がありません）/,
+    ],
+    [
+      '版 2 の sessions の deckId が空',
+      (data) => {
+        firstSession(data).deckId = '';
+      },
+      /sessions の 1 件目: deckId が不正です（""）/,
+    ],
+    [
+      '版 2 の sessions の deckId が文字列でない',
+      (data) => {
+        firstSession(data).deckId = 1;
+      },
+      /sessions の 1 件目: deckId が不正です（1）/,
     ],
     [
       'sessions の mode が不明',

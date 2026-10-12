@@ -23,18 +23,18 @@
 
 ## コマンド
 
-| コマンド           | 内容                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------ |
-| `npm install`      | 依存パッケージを入れる                                                                           |
-| `npm run dev`      | 開発用サーバーを起動する                                                                         |
-| `npm run build`    | データを検証して `dist/` にビルドする                                                            |
-| `npm run preview`  | ビルドした `dist/` を手元で配信する                                                              |
-| `npm test`         | 単体テスト（vitest）                                                                             |
-| `npm run test:e2e` | 画面のテスト（Playwright の WebKit。ビルドしてから `vite preview` で確認する）                   |
-| `npm run lint`     | 型検査（`tsc --noEmit`）と ESLint                                                                |
-| `npm run format`   | Prettier で整形する                                                                              |
-| `npm run data`     | CSV を検証して `src/generated/deck.json` を作る（`dev`・`build`・`lint` の前に自動で実行される） |
-| `npm run deploy`   | ビルドして Cloudflare に配信する                                                                 |
+| コマンド           | 内容                                                                                                       |
+| ------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `npm install`      | 依存パッケージを入れる                                                                                     |
+| `npm run dev`      | 開発用サーバーを起動する                                                                                   |
+| `npm run build`    | データを検証して `dist/` にビルドする                                                                      |
+| `npm run preview`  | ビルドした `dist/` を手元で配信する                                                                        |
+| `npm test`         | 単体テスト（vitest）                                                                                       |
+| `npm run test:e2e` | 画面のテスト（Playwright の WebKit。ビルドしてから `vite preview` で確認する）                             |
+| `npm run lint`     | 型検査（`tsc --noEmit`）と ESLint                                                                          |
+| `npm run format`   | Prettier で整形する                                                                                        |
+| `npm run data`     | 全教材の CSV を検証して `src/generated/decks.json` を作る（`dev`・`build`・`lint` の前に自動で実行される） |
+| `npm run deploy`   | ビルドして Cloudflare に配信する                                                                           |
 
 ## データ
 

@@ -17,33 +17,54 @@ export type Era =
   | '令和';
 
 /**
- * 出題パターン。`yearInput` = 年号入力（パターン A）、`yearChoice` = 年号 4 択（パターン C）、
+ * 年表の出題パターン。`yearInput` = 年号入力（パターン A）、`yearChoice` = 年号 4 択（パターン C）、
  * `choice` = 出来事 4 択（パターン B）。`choice` は 0.1 系の記録を引き継ぐため名前を変えない（設計書 5.4 節）。
  */
-export type Pattern = 'yearInput' | 'yearChoice' | 'choice';
+export type TimelinePattern = 'yearInput' | 'yearChoice' | 'choice';
 
 /** 型にパターンを足すとき、一覧への追加も型検査で必須にする。 */
-const PATTERN_KEYS: Record<Pattern, true> = {
+const TIMELINE_PATTERN_KEYS: Record<TimelinePattern, true> = {
   yearInput: true,
   yearChoice: true,
   choice: true,
 };
 
-/** 出題パターンの並び（年号入力・年号 4 択・出来事 4 択）。ミックスはこの中から選ぶ。 */
-export const PATTERNS: readonly Pattern[] = Object.keys(PATTERN_KEYS) as Pattern[];
+/** 年表の出題パターンの並び（年号入力・年号 4 択・出来事 4 択）。ミックスはこの中から選ぶ。 */
+export const TIMELINE_PATTERNS: readonly TimelinePattern[] = Object.keys(
+  TIMELINE_PATTERN_KEYS,
+) as TimelinePattern[];
+
+/**
+ * 出題パターン（全種類の教材のもの）。回答の記録（`attempts`・`eventStats`）にはこの値が入る。
+ * 教材の種類を足すときは、その種類のパターンをここに加える。
+ */
+export type Pattern = TimelinePattern;
+
+/** 全種類の教材の出題パターン（書き出しファイルの検証で使う）。 */
+export const PATTERNS: readonly Pattern[] = [...TIMELINE_PATTERNS];
 
 /** 学習段階。CSV の `level` 列が空なら `中学`。 */
 export type Level = '中学' | '高校';
 
 /**
- * 出来事の区分。`core.csv` の行は基本の年表（初期データ）、`pool.csv` の行は追加データ。
- * どちらも `level` が `中学` なら出題の母集団に入り、出来事 4 択の誤答の候補には両方を使う。
+ * 項目の区分。`core.csv` の行は基本データ（年表では基本の年表 = 初期データ）、`pool.csv` の行は追加データ。
+ * どちらも `level` が `中学` なら出題の母集団に入り、4 択の誤答の候補には両方を使う。
  */
 export type Role = 'core' | 'pool';
 
-/** 出来事（年表の 1 行）。 */
-export interface Event {
+/**
+ * 項目（教材の 1 行）の共通の部分（設計書 5 章の冒頭）。記録はこの `id` に紐づく。
+ * 復習と成績の集計は、項目のうちこの部分だけを直接使い、残りは教材の種類ごとの差分（`decks.ts` の `KindRules`）を
+ * 通して扱う。
+ */
+export interface Item {
   id: string;
+  level: Level;
+  role: Role;
+}
+
+/** 出来事（年表の教材の項目。設計書 5.1 節）。 */
+export interface Event extends Item {
   /** 代表年。紀元前は負数。0 は使わない。 */
   year: number;
   title: string;
@@ -55,22 +76,31 @@ export interface Event {
   altYears: number[];
   /** 年の表示の上書き。無ければ null。 */
   yearLabel: string | null;
-  level: Level;
-  role: Role;
 }
 
-/** 問題集。 */
-export interface Deck {
+/** 教材の種類（設計書 5 章の冒頭）。`timeline` = 年表。 */
+export type DeckKind = 'timeline';
+
+/** 年表の教材。 */
+export interface TimelineDeck {
   id: string;
+  kind: 'timeline';
   name: string;
-  events: Event[];
+  /** core.csv と pool.csv の全行（`高校` の行も含む）。 */
+  items: Event[];
 }
+
+/** 教材（生成物 `decks.json` の 1 要素）。`kind` で項目の型が決まる。 */
+export type Deck = TimelineDeck;
 
 /**
  * セッション開始時に選ぶ出題パターン（設計書 6.1 節の 3）。
- * `mixed` は 1 問ごとに、その出来事に適格なパターンから等確率で選ぶ。
+ * `mixed` は 1 問ごとに、その項目に適格なパターンから等確率で選ぶ。
  */
 export type PatternMode = Pattern | 'mixed';
+
+/** 年表の出題設定で選ぶ出題パターン。 */
+export type TimelinePatternMode = TimelinePattern | 'mixed';
 
 /**
  * 出題範囲（設計書 6.1 節の 2）。
@@ -84,21 +114,27 @@ export type Range =
 /** 1 セッションの問題数（設計書 6.1 節の 4）。`all` は適格な全件。 */
 export type QuestionCount = 10 | 20 | 'all';
 
-/** 1 問。問題列と選択肢はセッション開始時に確定し、画面では変えない（設計書 6.1 節の 6）。 */
-export type Question =
-  | { event: Event; pattern: 'yearInput' }
+/** 年表の 1 問。 */
+export type TimelineQuestion =
+  | { item: Event; pattern: 'yearInput' }
   | {
-      event: Event;
+      item: Event;
       pattern: 'yearChoice';
-      /** 正解（`event.year`）と誤答 3 つの 4 つの年。小さい順。 */
+      /** 正解（`item.year`）と誤答 3 つの 4 つの年。小さい順。 */
       years: number[];
     }
   | {
-      event: Event;
+      item: Event;
       pattern: 'choice';
-      /** 正解（`event`）と誤答 3 件の 4 件。並びはシャッフル済み。 */
+      /** 正解（`item`）と誤答 3 件の 4 件。並びはシャッフル済み。 */
       choices: Event[];
     };
+
+/**
+ * 1 問（全種類の教材のもの）。どれも出題した項目 `item` とパターン `pattern` を持つ。
+ * 問題列と選択肢はセッション開始時に確定し、画面では変えない（設計書 6.1 節の 6）。
+ */
+export type Question = TimelineQuestion;
 
 /** 回答の記録（IndexedDB の `attempts`。追記のみで、成績の正本）。 */
 export interface Attempt {
@@ -119,6 +155,8 @@ export type SessionMode = 'normal' | 'review';
 export interface Session {
   /** UUID。 */
   id: string;
+  /** 教材の id。1.0 の記録には無いので、読むときに `japanese-history` を補う。 */
+  deckId: string;
   mode: SessionMode;
   /** 選んだ出題パターン。復習は `null`。 */
   pattern: PatternMode | null;
@@ -136,7 +174,10 @@ export interface Session {
   correct: number;
 }
 
-/** 出来事 × パターンの集計（IndexedDB の `eventStats`。キーは `[eventId, pattern]`）。 */
+/**
+ * 項目 × パターンの集計（IndexedDB の `eventStats`。キーは `[eventId, pattern]`）。
+ * `eventId` は項目の id（名前は 1.0 の記録を引き継ぐため変えない）。
+ */
 export interface EventStats {
   eventId: string;
   pattern: Pattern;
@@ -158,10 +199,10 @@ export interface EventStats {
  */
 export type EventScope = 'core' | 'all';
 
-/** 出題設定（IndexedDB の `meta.settings`）。最後に選んだものを次回の初期値にする。 */
+/** 年表の出題設定（IndexedDB の `meta` の `settings:<教材の id>`）。最後に選んだものを次回の初期値にする。 */
 export interface Settings {
   scope: EventScope;
-  pattern: PatternMode;
+  pattern: TimelinePatternMode;
   count: QuestionCount;
   range: Range;
 }

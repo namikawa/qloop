@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { localDateKey } from '../core/date';
+import { deckModel, pickDeck, type DeckModel } from '../core/decks';
 import type { Deck, Question, Session } from '../core/models';
-import { population } from '../core/quiz';
 import { reviewCandidates } from '../core/review';
 import { streakDays } from '../core/stats';
-import deckJson from '../generated/deck.json';
+import decksJson from '../generated/decks.json';
 import { shouldShowInstallBanner } from '../pwa/standalone';
 import { useAppUpdate } from '../pwa/update';
 import { openDb, requestPersistentStorage } from '../storage/db';
@@ -17,10 +17,14 @@ import { Result } from './screens/Result';
 import { ReviewSetup } from './screens/ReviewSetup';
 import { Stats } from './screens/Stats';
 
-const deck = deckJson as Deck;
-/** 出題の母集団。出題設定の「出題する出来事」の絞り込みは出題設定の画面で行い、復習と成績はこの全体を使う。 */
-const targets = population(deck);
-const coreCount = targets.filter((event) => event.role === 'core').length;
+/**
+ * 教材の一覧（`decks.json` の並び = 教材の定義の並び）と、その種類の差分・母集団。
+ * 出題設定の「出題する項目」の絞り込みは出題設定の画面で行い、復習と成績は母集団の全体を使う。
+ */
+const DECKS: readonly DeckModel[] = (decksJson as Deck[]).map(deckModel);
+
+/** 教材が 2 つ以上のときだけ、ホームの切り替えと各画面の見出しの下の教材名を出す（設計書 6.9 節）。 */
+const SHOW_DECK_NAMES = DECKS.length > 1;
 
 /** 画面の状態。ルーティングライブラリは使わず、アプリ内の状態で切り替える（設計書 3 章）。 */
 type View =
@@ -58,6 +62,8 @@ export function App() {
   const update = useAppUpdate();
   const [storeState, setStoreState] = useState<StoreState>({ status: 'loading' });
   const [view, setView] = useState<View>({ screen: 'home' });
+  // この起動の間にホームで選んだ教材の id。選ぶまでは、保存した最後の教材（`lastDeck`）を使う
+  const [chosenDeckId, setChosenDeckId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -84,15 +90,22 @@ export function App() {
   }, [view]);
 
   const store = storeState.status === 'ready' ? storeState.store : null;
+  // 選んだ教材。保存が無いときと、無い教材を指しているときは最初の教材（設計書 6.9 節）
+  const current = pickDeck(DECKS, chosenDeckId ?? store?.getLastDeck() ?? null);
+  const { deck, rules } = current;
+  const deckName = SHOW_DECK_NAMES ? deck.name : undefined;
+  const goHome = () => setView({ screen: 'home' });
+  const startQuiz = (session: Session, questions: Question[]) =>
+    setView({ screen: 'quiz', session, questions });
 
   if (store !== null && view.screen === 'setup') {
     return (
       <QuizSetup
         store={store}
-        population={targets}
-        allEvents={deck.events}
-        onStart={(session, questions) => setView({ screen: 'quiz', session, questions })}
-        onBack={() => setView({ screen: 'home' })}
+        model={current}
+        deckName={deckName}
+        onStart={startQuiz}
+        onBack={goHome}
       />
     );
   }
@@ -100,15 +113,27 @@ export function App() {
     return (
       <ReviewSetup
         store={store}
-        population={targets}
-        allEvents={deck.events}
-        onStart={(session, questions) => setView({ screen: 'quiz', session, questions })}
-        onBack={() => setView({ screen: 'home' })}
+        deckId={deck.id}
+        deckName={deckName}
+        population={current.population}
+        allItems={deck.items}
+        rules={rules}
+        onStart={startQuiz}
+        onBack={goHome}
       />
     );
   }
   if (store !== null && view.screen === 'stats') {
-    return <Stats store={store} population={targets} onBack={() => setView({ screen: 'home' })} />;
+    return (
+      <Stats
+        store={store}
+        deckId={deck.id}
+        deckName={deckName}
+        population={current.population}
+        rules={rules}
+        onBack={goHome}
+      />
+    );
   }
   if (store !== null && view.screen === 'quiz') {
     return (
@@ -122,16 +147,26 @@ export function App() {
     );
   }
   if (view.screen === 'result') {
-    return <Result result={view.result} onHome={() => setView({ screen: 'home' })} />;
+    return <Result result={view.result} rules={rules} onHome={goHome} />;
   }
 
-  // ホームの連続学習日数と復習の件数。復習の件数は復習の画面と同じ数え方
+  const selectDeck = (deckId: string) => {
+    setChosenDeckId(deckId);
+    // 保存できなくても、この起動の間は選んだ教材で続ける（次回の初期値になるだけなので知らせない）
+    store?.saveLastDeck(deckId).catch(() => undefined);
+  };
+
+  // ホームの連続学習日数と復習の件数。連続学習日数は全教材で共通、復習の件数は選んだ教材の分を復習の画面と同じ数え方で
   const now = new Date();
   return (
     <Home
+      decks={SHOW_DECK_NAMES ? DECKS.map((model) => model.deck) : null}
+      deckId={deck.id}
+      onSelectDeck={selectDeck}
       deckName={deck.name}
-      targetCount={targets.length}
-      coreCount={coreCount}
+      labels={rules.labels}
+      targetCount={current.population.length}
+      coreCount={current.population.filter((item) => item.role === 'core').length}
       version={__APP_VERSION__}
       storeStatus={storeState}
       streakDays={store === null ? null : streakDays(store.getStudyDays(), localDateKey(now))}
@@ -139,10 +174,11 @@ export function App() {
         store === null
           ? null
           : reviewCandidates({
-              population: targets,
-              allEvents: deck.events,
+              population: current.population,
+              allItems: deck.items,
               stats: store.listEventStats(),
               now,
+              rules,
             }).length
       }
       onStartQuiz={() => setView({ screen: 'setup' })}

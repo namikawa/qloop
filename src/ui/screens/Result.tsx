@@ -1,13 +1,16 @@
+import type { KindRules } from '../../core/decks';
+import type { Pattern } from '../../core/models';
 import { progressSteps } from '../../core/progress';
-import { formatAnswerYears } from '../../core/year';
 import { Banner } from '../components/Banner';
 import { BottomBar } from '../components/BottomBar';
 import { ProgressSteps } from '../components/ProgressSteps';
 import { ScreenHeader } from '../components/ScreenHeader';
-import type { QuizResult } from './Quiz';
+import type { AnsweredQuestion, QuizResult } from './Quiz';
 
 interface ResultProps {
   result: QuizResult;
+  /** 出題した教材の種類の差分（画面の言葉と、間違えた項目の表示）。 */
+  rules: Pick<KindRules<AnsweredQuestion['item'], Pattern>, 'labels' | 'itemTitle' | 'answerText'>;
   onHome: () => void;
 }
 
@@ -45,8 +48,8 @@ function ScoreRing({ ratio }: { ratio: number }) {
   );
 }
 
-/** まとめの画面（設計書 6.4 節の 6）。正答数 / 回答済み数と、間違えた出来事の一覧を出す。 */
-export function Result({ result, onHome }: ResultProps) {
+/** まとめの画面（設計書 6.4 節の 6）。正答数 / 回答済み数と、間違えた項目（年表は出来事）の一覧を出す。 */
+export function Result({ result, rules, onHome }: ResultProps) {
   const answered = result.answers.length;
   const correct = result.answers.filter((answer) => answer.outcome === 'correct').length;
   const wrong = result.answers.filter((answer) => answer.outcome !== 'correct');
@@ -86,17 +89,17 @@ export function Result({ result, onHome }: ResultProps) {
 
         <section aria-labelledby="result-wrong-title">
           <h2 id="result-wrong-title" className="section-label">
-            間違えた出来事
+            間違えた{rules.labels.item}
           </h2>
           {wrong.length === 0 ? (
             <p className="empty-text">ありません</p>
           ) : (
             <ul className="card card-flat list-card" data-testid="wrong-list">
               {wrong.map((answer) => (
-                // 復習では同じ出来事が 2 つのパターンで出ることがあるので、パターンも key に含める
-                <li key={`${answer.pattern}:${answer.event.id}`} className="wrong-item">
-                  <span className="wrong-title">{answer.event.title}</span>
-                  <span className="wrong-year">{formatAnswerYears(answer.event)}</span>
+                // 復習では同じ項目が複数のパターンで出ることがあるので、パターンも key に含める
+                <li key={`${answer.pattern}:${answer.item.id}`} className="wrong-item">
+                  <span className="wrong-title">{rules.itemTitle(answer.item)}</span>
+                  <span className="wrong-year">{rules.answerText(answer.item)}</span>
                 </li>
               ))}
             </ul>
