@@ -1,5 +1,12 @@
 # 変更履歴
 
+## [1.2.0] - 2026-10-14
+
+### 追加
+
+- 教材を眺める一覧（日本史年表は「年表」、語彙は「言葉の一覧」）。時代・種類での絞り込みと、年・出来事・意味・言葉を隠して行を押すと出す暗記カード、復習する項目の札
+- 結果画面の間違えた項目から、一覧のその項目への移動
+
 ## [1.1.2] - 2026-10-14
 
 ### 追加
@@ -46,6 +53,7 @@
 - ホーム画面の「アプリを更新」で、新しい版を探して切り替える
 - 年表のデータ: 出題できる出来事 371 件（うち基本の年表 129 件）
 
+[1.2.0]: https://github.com/namikawa/qloop/releases/tag/v1.2.0
 [1.1.2]: https://github.com/namikawa/qloop/releases/tag/v1.1.2
 [1.1.1]: https://github.com/namikawa/qloop/releases/tag/v1.1.1
 [1.1.0]: https://github.com/namikawa/qloop/releases/tag/v1.1.0

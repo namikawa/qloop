@@ -3,6 +3,7 @@ import type { KindLabels } from '../../core/decks';
 import type { UpdateCheckCallbacks, UpdateCheckResult } from '../../pwa/update-check';
 import { Banner, BannerCloseButton } from '../components/Banner';
 import {
+  BrowseIcon,
   ChevronRightIcon,
   ReviewIcon,
   ShareIcon,
@@ -39,6 +40,8 @@ interface HomeProps {
   onStartQuiz: () => void;
   onStartReview: () => void;
   onOpenStats: () => void;
+  browseName: string;
+  onOpenBrowse: () => void;
   installBannerVisible: boolean;
   onCloseInstallBanner: () => void;
   updateAvailable: boolean;
@@ -136,6 +139,8 @@ export function Home({
   onStartQuiz,
   onStartReview,
   onOpenStats,
+  browseName,
+  onOpenBrowse,
   installBannerVisible,
   onCloseInstallBanner,
   updateAvailable,
@@ -228,6 +233,11 @@ export function Home({
             出題
           </button>
           <div className="deck-menu">
+            <button type="button" className="menu-row" disabled={!ready} onClick={onOpenBrowse}>
+              <BrowseIcon className="menu-icon" />
+              <span className="menu-label">{browseName}</span>
+              <ChevronRightIcon className="menu-chevron" />
+            </button>
             <button
               type="button"
               className="menu-row"

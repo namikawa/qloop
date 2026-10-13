@@ -1540,7 +1540,7 @@ button:disabled {
   padding: var(--space-3) var(--space-4);
 }
 
-.wrong-item + .wrong-item {
+.list-card li + li > .wrong-item {
   border-top: 1px solid var(--color-divider);
 }
 
@@ -1962,7 +1962,7 @@ button:disabled {
   padding-bottom: var(--space-4);
 }
 
-.wrong-item-stacked {
+.wrong-item-stacked .wrong-content {
   flex-direction: column;
   gap: var(--space-1);
 }
@@ -1975,4 +1975,141 @@ button:disabled {
 .wrong-item-stacked .wrong-year {
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+/* ---- 一覧 ---- */
+
+.browse-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.browse-count {
+  margin: var(--space-6) 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.browse-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) 0;
+  background: var(--color-bg);
+}
+
+.browse-section + .browse-section {
+  margin-top: var(--space-3);
+}
+
+.browse-row {
+  display: flex;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--height-control);
+  padding: var(--space-3) var(--space-4);
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  cursor: default;
+}
+
+.list-card li + li > .browse-row {
+  border-top: 1px solid var(--color-divider);
+}
+
+.browse-row-inline .browse-front {
+  flex: 0 0 5em;
+  width: 5em;
+  font-variant-numeric: tabular-nums;
+}
+
+.browse-front,
+.browse-back {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.browse-back {
+  flex: 1;
+}
+
+.browse-row-stacked {
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.browse-row-stacked .browse-front {
+  font-weight: var(--font-weight-semibold);
+}
+
+.browse-reading {
+  display: inline-block;
+  margin-left: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sub);
+  font-weight: 400;
+}
+
+.browse-hidden {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-chip);
+  background: var(--color-giveup-tint);
+  color: var(--color-giveup-text);
+}
+
+.browse-review {
+  margin-left: var(--space-2);
+  vertical-align: middle;
+}
+
+.browse-interactive {
+  cursor: pointer;
+}
+
+.browse-interactive:active {
+  background: var(--color-surface-inset);
+}
+
+.browse-highlight,
+.browse-highlight:active {
+  background: var(--color-primary-tint);
+}
+
+/* 結果の行は内容をまとめ、右端に移動の山形を置く。 */
+.wrong-item {
+  align-items: center;
+  width: 100%;
+  min-height: var(--height-control);
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-body);
+  text-align: left;
+}
+
+.wrong-content {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.wrong-chevron {
+  flex: none;
+  color: var(--color-chevron);
+}
+
+.wrong-item:active {
+  background: var(--color-surface-inset);
 }

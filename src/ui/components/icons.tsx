@@ -78,6 +78,25 @@ export function ReviewIcon({ className }: IconProps) {
   );
 }
 
+/** 一覧（箇条書きの 3 行）。 */
+export function BrowseIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      width="22"
+      height="22"
+      viewBox="0 0 22 22"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      {...hidden}
+    >
+      <path d="M8 5h10M8 11h10M8 17h10M4 5h.1M4 11h.1M4 17h.1" />
+    </svg>
+  );
+}
+
 /** 成績（高さの違う縦線 3 本）。 */
 export function StatsIcon({ className }: IconProps) {
   return (

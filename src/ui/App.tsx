@@ -10,6 +10,7 @@ import { useAppUpdate } from '../pwa/update';
 import { openDb, requestPersistentStorage } from '../storage/db';
 import { ProgressStore } from '../storage/progress-store';
 import { describeError } from './errors';
+import { Browse } from './screens/Browse';
 import { Home, type StoreStatus } from './screens/Home';
 import { Quiz, type QuizResult } from './screens/Quiz';
 import { QuizSetup } from './screens/QuizSetup';
@@ -34,7 +35,12 @@ type View =
   | { screen: 'review-setup' }
   | { screen: 'stats' }
   | { screen: 'quiz'; session: Session; questions: Question[] }
-  | { screen: 'result'; result: QuizResult };
+  | { screen: 'result'; result: QuizResult; scrollY?: number }
+  | {
+      screen: 'browse';
+      returnTo: { screen: 'home' } | { screen: 'result'; result: QuizResult; scrollY: number };
+      highlightId: string | null;
+    };
 
 /** 学習の記録（IndexedDB）の準備の状態。 */
 type StoreState =
@@ -87,7 +93,8 @@ export function App() {
 
   // 画面を切り替えたら先頭から表示する
   useEffect(() => {
-    window.scrollTo(0, 0);
+    if (view.screen === 'browse' && view.highlightId !== null) return;
+    window.scrollTo(0, view.screen === 'result' ? (view.scrollY ?? 0) : 0);
   }, [view]);
 
   const store = storeState.status === 'ready' ? storeState.store : null;
@@ -156,8 +163,41 @@ export function App() {
       />
     );
   }
+  if (store !== null && view.screen === 'browse') {
+    const savedScope =
+      current.kind === 'timeline'
+        ? store.getSettings(deck.id)?.scope
+        : store.getSettings(deck.id, 'vocabulary')?.scope;
+    const item = current.population.find((item) => item.id === view.highlightId);
+    return (
+      <Browse<Question['item'], Pattern>
+        store={store}
+        deckName={deckName}
+        population={current.population}
+        allItems={deck.items}
+        rules={rules}
+        initialScope={item?.role === 'pool' ? 'all' : (savedScope ?? 'core')}
+        highlightId={view.highlightId}
+        fromResult={view.returnTo.screen === 'result'}
+        onBack={() => setView(view.returnTo)}
+      />
+    );
+  }
   if (view.screen === 'result') {
-    return <Result result={view.result} rules={rules} onHome={goHome} />;
+    return (
+      <Result
+        result={view.result}
+        rules={rules}
+        onHome={goHome}
+        onOpenBrowse={(highlightId) =>
+          setView({
+            screen: 'browse',
+            returnTo: { screen: 'result', result: view.result, scrollY: window.scrollY },
+            highlightId,
+          })
+        }
+      />
+    );
   }
 
   const selectDeck = (deckId: string) => {
@@ -193,6 +233,10 @@ export function App() {
       }
       onStartQuiz={() => setView({ screen: 'setup' })}
       onStartReview={() => setView({ screen: 'review-setup' })}
+      browseName={rules.browse.name}
+      onOpenBrowse={() =>
+        setView({ screen: 'browse', returnTo: { screen: 'home' }, highlightId: null })
+      }
       onOpenStats={() => setView({ screen: 'stats' })}
       installBannerVisible={installBannerVisible}
       onCloseInstallBanner={() => setInstallBannerVisible(false)}

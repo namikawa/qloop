@@ -2,6 +2,7 @@ import type { KindRules } from '../../core/decks';
 import type { Pattern } from '../../core/models';
 import { progressSteps } from '../../core/progress';
 import { Banner } from '../components/Banner';
+import { ChevronRightIcon } from '../components/icons';
 import { BottomBar } from '../components/BottomBar';
 import { ProgressSteps } from '../components/ProgressSteps';
 import { ScreenHeader } from '../components/ScreenHeader';
@@ -15,6 +16,7 @@ interface ResultProps {
     'labels' | 'itemTitle' | 'itemReading' | 'resultLayout' | 'answerText'
   >;
   onHome: () => void;
+  onOpenBrowse: (itemId: string) => void;
 }
 
 /** 輪のグラフの半径と線の太さ（112px の正方形の中央に描く）。 */
@@ -52,7 +54,7 @@ function ScoreRing({ ratio }: { ratio: number }) {
 }
 
 /** まとめの画面（設計書 6.4 節の 6）。正答数 / 回答済み数と、間違えた項目（年表は出来事）の一覧を出す。 */
-export function Result({ result, rules, onHome }: ResultProps) {
+export function Result({ result, rules, onHome, onOpenBrowse }: ResultProps) {
   const answered = result.answers.length;
   const correct = result.answers.filter((answer) => answer.outcome === 'correct').length;
   const wrong = result.answers.filter((answer) => answer.outcome !== 'correct');
@@ -102,17 +104,23 @@ export function Result({ result, rules, onHome }: ResultProps) {
                 const reading = rules.itemReading(answer.item);
                 // 復習では同じ項目が複数のパターンで出ることがあるので、パターンも key に含める
                 return (
-                  <li
-                    key={`${answer.pattern}:${answer.item.id}`}
-                    className={
-                      rules.resultLayout === 'stacked'
-                        ? 'wrong-item wrong-item-stacked'
-                        : 'wrong-item'
-                    }
-                  >
-                    <span className="wrong-title">{rules.itemTitle(answer.item)}</span>
-                    {reading !== null && <span className="wrong-reading">{reading}</span>}
-                    <span className="wrong-year">{rules.answerText(answer.item)}</span>
+                  <li key={`${answer.pattern}:${answer.item.id}`}>
+                    <button
+                      type="button"
+                      onClick={() => onOpenBrowse(answer.item.id)}
+                      className={
+                        rules.resultLayout === 'stacked'
+                          ? 'wrong-item wrong-item-stacked'
+                          : 'wrong-item'
+                      }
+                    >
+                      <span className="wrong-content">
+                        <span className="wrong-title">{rules.itemTitle(answer.item)}</span>
+                        {reading !== null && <span className="wrong-reading">{reading}</span>}
+                        <span className="wrong-year">{rules.answerText(answer.item)}</span>
+                      </span>
+                      <ChevronRightIcon className="wrong-chevron" />
+                    </button>
                   </li>
                 );
               })}

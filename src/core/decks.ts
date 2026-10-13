@@ -1,3 +1,4 @@
+import type { BrowseRules } from './browse';
 import { buildDeck } from './deck';
 import { ERAS } from './era';
 import {
@@ -111,7 +112,7 @@ export interface KindLabels {
  * （`SessionLabels`）が使うものと、画面の言葉・項目の表示をまとめる。
  */
 export interface KindRules<I extends Item, P extends Pattern>
-  extends ReviewRules<I, P>, StatsRules<I, P>, SessionLabels {
+  extends ReviewRules<I, P>, StatsRules<I, P>, SessionLabels, BrowseRules<I> {
   readonly kind: DeckKind;
   readonly labels: KindLabels;
   /** 項目の見出し（成績の項目別と、まとめの間違えた項目）。年表は出来事の文。 */
@@ -137,6 +138,18 @@ const TIMELINE_PATTERN_LABELS: Readonly<Record<TimelinePatternMode, string>> = {
 /** 年表の教材の差分。 */
 export const TIMELINE_RULES: KindRules<Event, TimelinePattern> = {
   kind: 'timeline',
+  browse: {
+    name: '年表',
+    layout: 'inline',
+    hideOptions: [
+      { value: 'front', label: '年' },
+      { value: 'back', label: '出来事' },
+    ],
+    front: (event) => formatAnswerYears(event),
+    reading: () => null,
+    back: (event) => event.title,
+    compare: (a, b) => a.year - b.year,
+  },
   labels: { item: '出来事', core: '基本の年表', group: '時代' },
   patterns: TIMELINE_PATTERNS,
   patternLabel: (pattern: PatternMode) =>
@@ -153,6 +166,8 @@ export const TIMELINE_RULES: KindRules<Event, TimelinePattern> = {
   answerText: (event) => formatAnswerYears(event),
 };
 
+const JAPANESE_COLLATOR = new Intl.Collator('ja');
+
 const VOCABULARY_PATTERN_LABELS: Readonly<Record<VocabularyPatternMode, string>> = {
   meaningChoice: '意味 4 択',
   wordChoice: '言葉 4 択',
@@ -162,6 +177,18 @@ const VOCABULARY_PATTERN_LABELS: Readonly<Record<VocabularyPatternMode, string>>
 /** 語彙の教材の差分（設計書 5.7・6.8 節、7・8 章）。 */
 export const VOCABULARY_RULES: KindRules<Word, VocabularyPattern> = {
   kind: 'vocabulary',
+  browse: {
+    name: '言葉の一覧',
+    layout: 'stacked',
+    hideOptions: [
+      { value: 'back', label: '意味' },
+      { value: 'front', label: '言葉' },
+    ],
+    front: (word) => word.word,
+    reading: (word) => word.reading,
+    back: (word) => word.meaning,
+    compare: (a, b) => JAPANESE_COLLATOR.compare(a.reading ?? a.word, b.reading ?? b.word),
+  },
   labels: { item: '言葉', core: '基本の語彙', group: '種類' },
   patterns: VOCABULARY_PATTERNS,
   patternLabel: (pattern: PatternMode) =>
