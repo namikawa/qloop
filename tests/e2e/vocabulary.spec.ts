@@ -69,7 +69,8 @@ async function expectResultReadings(page: Page): Promise<void> {
   }
 }
 async function expectStatsReadings(page: Page): Promise<void> {
-  const words = readWords();
+  // 成績の対象は母集団（中学の言葉）で、高校の言葉は出さない。
+  const words = readWords().filter((item) => item.level === '中学');
   const rows = page.getByTestId('event-row');
   await expect(rows).toHaveCount(words.length);
   for (const row of await rows.all()) {
