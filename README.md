@@ -1,6 +1,6 @@
 # QLoop
 
-1 問 1 答で勉強する PWA（ホーム画面に追加して使う Web アプリ）。
+一問一答で勉強する PWA（ホーム画面に追加して使う Web アプリ）。
 
 - 公開 URL: https://qloop.na3.workers.dev
 - iPhone の Safari で URL を開き、共有メニューの「ホーム画面に追加」で導入する。
@@ -40,14 +40,10 @@
 
 - 日本史年表の教材は `data/decks/japanese-history/` の `core.csv`（基本の年表）と `pool.csv`（追加データ）。
 - 語彙の教材は `data/decks/japanese-vocabulary/` の `core.csv`（基本の語彙。慣用句 86 件）と `pool.csv`（追加データ。慣用句 233 件）。意味 4 択・言葉 4 択・ミックスで出題する。
-- 英単語の教材は `data/decks/english-words/` の `core.csv`（本とレッスンごとの一覧。レッスンごとに足す。追加データは無い）。意味 4 択・英単語 4 択・ミックスで出題する。
+- 英単語の教材は `data/decks/english-words/` の `core.csv`（レッスンごとの一覧。レッスンごとに足す。追加データは無い）。意味 4 択・英単語 4 択・ミックスで出題する。
 - 年表データの「正しさ」は、歴史的な史実ではなく、現代の中学受験・高校受験で出題される問題での正解とする。語彙も同じく、辞書の記述や語源ではなく、受験の問題での正解（意味と表記）を正とする。英単語は、利用者が用意した一覧の意味と表記を正とする。基準の詳細とデータを足す手順は `docs/data.md`、列の形式と検証の規則は `docs/design.md` の 5 章を参照。
 
 ## デプロイ
 
 - `npm run deploy` を実行する。初回だけ `npx wrangler login` で Cloudflare にログインしておく。
 - リリースの手順（版の上げ方、`CHANGELOG.md` の書き方、タグと GitHub Release、配信後の確認）は `docs/operations.md` の 2 章を参照。
-
-## ライセンス
-
-[MIT ライセンス](LICENSE)。コードと教材データ（`data/`）の両方が対象。
