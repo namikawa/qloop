@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   availableBrowseGroups,
-  browseCountText,
+  browseRangeText,
   browseGroups,
   browseReviewIds,
   type BrowseHidden,
@@ -11,9 +11,9 @@ import type { EventScope, Item, Pattern } from '../../core/models';
 import { reviewCandidates } from '../../core/review';
 import type { ProgressStore } from '../../storage/progress-store';
 import { BottomBar } from '../components/BottomBar';
-import { CheckIcon } from '../components/icons';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { Segmented } from '../components/Segmented';
+import { GroupChips } from './VocabularyQuizSetup';
 
 interface BrowseProps<I extends Item, P extends Pattern> {
   store: ProgressStore;
@@ -39,7 +39,7 @@ export function Browse<I extends Item, P extends Pattern>({
   fromResult,
   onBack,
 }: BrowseProps<I, P>) {
-  const [scope, setScope] = useState(initialScope);
+  const [scope, setScope] = useState(rules.labels.core === null ? 'all' : initialScope);
   const [selected, setSelected] = useState<string[]>([]);
   const [hidden, setHidden] = useState<BrowseHidden>('none');
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
@@ -59,6 +59,12 @@ export function Browse<I extends Item, P extends Pattern>({
   const sections = browseGroups(population, rules, scope, selected);
   const count = sections.reduce((sum, section) => sum + section.items.length, 0);
   const { browse } = rules;
+  const rangeText = browseRangeText(
+    rules.labels.group,
+    rules.groups,
+    selected,
+    rules.browseRangeText,
+  );
 
   useEffect(() => {
     if (highlightId === null) return;
@@ -84,40 +90,33 @@ export function Browse<I extends Item, P extends Pattern>({
       <ScreenHeader title={browse.name} deckName={deckName} onBack={onBack} />
       <main className="screen-body browse-body">
         <div className="browse-filters">
-          <Segmented
-            legend={`表示する${rules.labels.item}`}
-            name="browse-scope"
-            options={[
-              { value: 'core', label: `${rules.labels.core}のみ` },
-              { value: 'all', label: 'すべて' },
-            ]}
-            value={scope}
-            onChange={setScope}
-          />
+          {rules.labels.core !== null && (
+            <Segmented
+              legend={`表示する${rules.labels.item}`}
+              name="browse-scope"
+              options={[
+                { value: 'core', label: `${rules.labels.core}のみ` },
+                { value: 'all', label: 'すべて' },
+              ]}
+              value={scope}
+              onChange={setScope}
+            />
+          )}
           <fieldset className="field">
             <legend className="field-legend">{rules.labels.group}</legend>
-            <div className="chip-options">
-              {groups.map((group) => (
-                <label className="chip" key={group}>
-                  <input
-                    type="checkbox"
-                    className="overlay-input"
-                    checked={selected.includes(group)}
-                    onChange={() =>
-                      setSelected((previous) =>
-                        previous.includes(group)
-                          ? previous.filter((value) => value !== group)
-                          : [...previous, group],
-                      )
-                    }
-                  />
-                  <span className="chip-label">
-                    <CheckIcon className="chip-check" />
-                    {group}
-                  </span>
-                </label>
-              ))}
-            </div>
+            <GroupChips
+              groups={groups}
+              groupHeading={rules.groupHeading}
+              groupChipLabel={rules.groupChipLabel}
+              selected={selected}
+              onToggle={(group) =>
+                setSelected((previous) =>
+                  previous.includes(group)
+                    ? previous.filter((value) => value !== group)
+                    : [...previous, group],
+                )
+              }
+            />
           </fieldset>
           <Segmented<BrowseHidden>
             legend="隠す"
@@ -131,7 +130,13 @@ export function Browse<I extends Item, P extends Pattern>({
           />
         </div>
         <p className="browse-count" data-testid="browse-count" role="status">
-          {browseCountText(rules.labels.group, rules.groups, selected, count)}
+          {count === 0 ? (
+            'ありません'
+          ) : (
+            <>
+              <span>{rangeText}</span> <span className="browse-count-number">{count} 件</span>
+            </>
+          )}
         </p>
         {sections.map((section) => (
           <section className="browse-section" key={section.name} aria-label={section.name}>

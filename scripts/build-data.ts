@@ -1,5 +1,5 @@
 /**
- * 教材の定義の一覧（src/core/decks.ts）を回し、各教材の data/decks/<dir>/ の core.csv と pool.csv を検証して、
+ * 教材の定義の一覧（src/core/decks.ts）を回し、各教材の data/decks/<dir>/ の core.csv（追加データがある教材は pool.csv も）を検証して、
  * src/generated/decks.json（教材の配列）を書く。
  * 検証に失敗したら全教材の全エラーを教材名・ファイル名・行番号付きで出し、終了コード 1 で終わる（ビルドを止める）。
  */
@@ -18,7 +18,9 @@ for (const definition of DECK_DEFINITIONS) {
   const deckDir = new URL(`../data/decks/${definition.dir}/`, import.meta.url);
   const result = buildDeckFromCsv(definition, {
     core: readFileSync(new URL('core.csv', deckDir), 'utf8'),
-    pool: readFileSync(new URL('pool.csv', deckDir), 'utf8'),
+    ...(definition.hasPool !== false
+      ? { pool: readFileSync(new URL('pool.csv', deckDir), 'utf8') }
+      : {}),
   });
   if (result.ok) {
     decks.push(result.deck);
@@ -46,6 +48,10 @@ for (const deck of decks) {
   const pool = deck.items.filter((item) => item.role === 'pool').length;
   const highSchool = deck.items.filter((item) => item.level === '高校').length;
   const targets = deck.items.filter((item) => item.level === '中学').length;
+  if (labels.core === null) {
+    console.log(`  ${deck.name}: ${targets} 件`);
+    continue;
+  }
   console.log(
     `  ${deck.name}: ${labels.core} ${core} 件、追加データ ${pool} 件（うち高校 ${highSchool} 件）、出題対象 ${targets} 件`,
   );

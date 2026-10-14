@@ -1,11 +1,27 @@
 import type { BrowseRules } from './browse';
 import { buildDeck } from './deck';
+import {
+  buildEnglishDeck,
+  buildQuestion as buildEnglishQuestion,
+  englishLessons,
+  formatEnglishRange,
+  isEligibleFor as isEnglishEligibleFor,
+  lessonChipLabel,
+  lessonHeading,
+  lessonName,
+  meaningWithPos,
+} from './english';
 import { ERAS } from './era';
 import {
+  ENGLISH_PATTERNS,
   TIMELINE_PATTERNS,
   VOCABULARY_PATTERNS,
   type Deck,
   type DeckKind,
+  type EnglishDeck,
+  type EnglishWord,
+  type EnglishPattern,
+  type EnglishPatternMode,
   type Event,
   type Item,
   type Pattern,
@@ -53,6 +69,8 @@ export interface DeckDefinition {
   idPrefix: string;
   /** データのディレクトリ名（`data/decks/<dir>/` に `core.csv` と `pool.csv` を置く）。 */
   dir: string;
+  /** 省略時は追加データあり。英単語は false。 */
+  hasPool?: boolean;
 }
 
 /** 教材の定義の一覧。並びはホームの切り替えの順で、先頭の教材を既定にする（設計書 6.9 節）。 */
@@ -71,28 +89,43 @@ export const DECK_DEFINITIONS: readonly DeckDefinition[] = [
     idPrefix: 'jv-',
     dir: 'japanese-vocabulary',
   },
+  {
+    id: 'english-words',
+    kind: 'english',
+    name: '英単語',
+    idPrefix: 'en-',
+    dir: 'english-words',
+    hasPool: false,
+  },
 ];
 
 export type BuildDeckFromCsvResult = { ok: true; deck: Deck } | { ok: false; errors: string[] };
 
 /**
- * 教材の CSV（`core.csv` と `pool.csv`）から教材を作って検証する（教材の種類で振り分ける）。
+ * 教材の CSV（`core.csv` と、追加データがある教材の `pool.csv`）から教材を作って検証する（教材の種類で振り分ける）。
  * エラーは「ファイル名 行番号 列名: 内容」の形で全件を返す（教材名は呼び出し側で付ける）。
  */
 export function buildDeckFromCsv(
   definition: DeckDefinition,
-  files: { core: string; pool: string },
+  files: { core: string; pool?: string },
 ): BuildDeckFromCsvResult {
   switch (definition.kind) {
+    case 'english':
+      return buildEnglishDeck({ ...definition, core: files.core });
     case 'vocabulary':
-      return buildVocabularyDeck({ ...definition, ...files, categories: VOCABULARY_CATEGORIES });
+      return buildVocabularyDeck({
+        ...definition,
+        ...files,
+        pool: files.pool ?? '',
+        categories: VOCABULARY_CATEGORIES,
+      });
     case 'timeline':
       return buildDeck({
         id: definition.id,
         name: definition.name,
         idPrefix: definition.idPrefix,
         core: files.core,
-        pool: files.pool,
+        pool: files.pool ?? '',
       });
   }
 }
@@ -101,8 +134,8 @@ export function buildDeckFromCsv(
 export interface KindLabels {
   /** 項目の呼び名（年表は「出来事」）。「出題できる出来事」「出題する出来事」「出来事別」「間違えた出来事」に使う。 */
   item: string;
-  /** 基本データの呼び名（年表は「基本の年表」）。「基本の年表のみ」などに使う。 */
-  core: string;
+  /** 基本データの呼び名（年表は「基本の年表」）。null の教材は基本のみの切り替えや内訳を持たない。 */
+  core: string | null;
   /** まとめる単位の呼び名（年表は「時代」）。成績の「時代別」に使う。 */
   group: string;
 }
@@ -115,6 +148,10 @@ export interface KindRules<I extends Item, P extends Pattern>
   extends ReviewRules<I, P>, StatsRules<I, P>, SessionLabels, BrowseRules<I> {
   readonly kind: DeckKind;
   readonly labels: KindLabels;
+  groupHeading(group: string): string | null;
+  groupChipLabel(group: string): string;
+  /** 一覧の件数の範囲。既存教材は従来の表示を使う。 */
+  browseRangeText?: (selected: readonly string[]) => string;
   /** 項目の見出し（成績の項目別と、まとめの間違えた項目）。年表は出来事の文。 */
   itemTitle(item: I): string;
   /** 成績の項目別で、見出しの下に出す補足。年表は年の表示。 */
@@ -151,6 +188,8 @@ export const TIMELINE_RULES: KindRules<Event, TimelinePattern> = {
     compare: (a, b) => a.year - b.year,
   },
   labels: { item: '出来事', core: '基本の年表', group: '時代' },
+  groupHeading: () => null,
+  groupChipLabel: (group) => group,
   patterns: TIMELINE_PATTERNS,
   patternLabel: (pattern: PatternMode) =>
     TIMELINE_PATTERN_LABELS[pattern as TimelinePatternMode] ?? pattern,
@@ -190,6 +229,8 @@ export const VOCABULARY_RULES: KindRules<Word, VocabularyPattern> = {
     compare: (a, b) => JAPANESE_COLLATOR.compare(a.reading ?? a.word, b.reading ?? b.word),
   },
   labels: { item: '言葉', core: '基本の語彙', group: '種類' },
+  groupHeading: () => null,
+  groupChipLabel: (group) => group,
   patterns: VOCABULARY_PATTERNS,
   patternLabel: (pattern: PatternMode) =>
     VOCABULARY_PATTERN_LABELS[pattern as VocabularyPatternMode] ?? pattern,
@@ -222,15 +263,73 @@ export interface VocabularyDeckModel {
   population: Word[];
 }
 
-/** 教材と、その種類の差分・母集団（設計書 5 章の冒頭）。画面はこれを通して教材を扱う。 */
-export type DeckModel = TimelineDeckModel | VocabularyDeckModel;
+/** 英単語の教材と、その差分・母集団。 */
+export interface EnglishDeckModel {
+  kind: 'english';
+  deck: EnglishDeck;
+  rules: KindRules<EnglishWord, EnglishPattern>;
+  population: EnglishWord[];
+}
+
+const ENGLISH_PATTERN_LABELS: Readonly<Record<EnglishPatternMode, string>> = {
+  englishMeaningChoice: '意味 4 択',
+  englishWordChoice: '英単語 4 択',
+  mixed: 'ミックス',
+};
+
+export function englishRules(
+  items: readonly EnglishWord[],
+): KindRules<EnglishWord, EnglishPattern> {
+  return {
+    kind: 'english',
+    labels: { item: '英単語', core: null, group: 'レッスン' },
+    patterns: ENGLISH_PATTERNS,
+    patternLabel: (pattern) => ENGLISH_PATTERN_LABELS[pattern as EnglishPatternMode] ?? pattern,
+    formatRange: formatEnglishRange,
+    isEligibleFor: isEnglishEligibleFor,
+    buildQuestion: buildEnglishQuestion,
+    groups: englishLessons(items),
+    groupOf: lessonName,
+    groupHeading: lessonHeading,
+    groupChipLabel: lessonChipLabel,
+    browseRangeText: (selected) =>
+      selected.length
+        ? formatEnglishRange({ kind: 'categories', categories: [...selected] })
+        : 'すべてのレッスン',
+    browse: {
+      name: '英単語を覚える',
+      layout: 'stacked',
+      hideOptions: [
+        { value: 'back', label: '意味' },
+        { value: 'front', label: '英単語' },
+      ],
+      front: (word) => word.word,
+      reading: () => null,
+      back: meaningWithPos,
+      compare: () => 0,
+    },
+    itemTitle: (word) => word.word,
+    itemDetail: (word) => `${meaningWithPos(word)} · ${lessonName(word)}`,
+    itemReading: () => null,
+    resultLayout: 'stacked',
+    answerText: meaningWithPos,
+  };
+}
+
+/** 教材と、その種類の差分・母集団。画面はこれを通して教材を扱う。 */
+export type DeckModel = TimelineDeckModel | VocabularyDeckModel | EnglishDeckModel;
 
 /** 教材の種類の差分を組み合わせる（教材の種類で振り分ける）。 */
 export function deckModel(deck: TimelineDeck): TimelineDeckModel;
 export function deckModel(deck: VocabularyDeck): VocabularyDeckModel;
+export function deckModel(deck: EnglishDeck): EnglishDeckModel;
 export function deckModel(deck: Deck): DeckModel;
 export function deckModel(deck: Deck): DeckModel {
   switch (deck.kind) {
+    case 'english': {
+      const targets = population(deck.items);
+      return { kind: 'english', deck, rules: englishRules(targets), population: targets };
+    }
     case 'timeline':
       return { kind: 'timeline', deck, rules: TIMELINE_RULES, population: population(deck.items) };
     case 'vocabulary':

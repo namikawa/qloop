@@ -420,3 +420,30 @@ describe('語彙の書き出しファイル', () => {
     },
   );
 });
+
+describe('英単語の書き出しファイル', () => {
+  it.each(['englishMeaningChoice', 'englishWordChoice'] as const)(
+    '%s の記録・教材・レッスン範囲をJSONの往復で保つ',
+    (pattern) => {
+      const input = variant((data) => {
+        firstAttempt(data).eventId = 'en-0001';
+        firstAttempt(data).pattern = pattern;
+        firstSession(data).pattern = pattern;
+        firstSession(data).deckId = 'english-words';
+        firstSession(data).range = {
+          kind: 'categories',
+          categories: ['STAGE2 Lesson 4', 'STAGE3 Lesson 1'],
+        };
+      });
+      const parsed = parseProgressExport(input);
+      const restored = parseProgressJson(JSON.stringify(parsed));
+      expect(restored).toEqual(parsed);
+      expect(restored.attempts[0]).toMatchObject({ eventId: 'en-0001', pattern });
+      expect(restored.sessions[0]).toMatchObject({
+        deckId: 'english-words',
+        pattern,
+        range: { kind: 'categories', categories: ['STAGE2 Lesson 4', 'STAGE3 Lesson 1'] },
+      });
+    },
+  );
+});

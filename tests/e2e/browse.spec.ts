@@ -59,6 +59,11 @@ for (const width of [375, 402]) {
       await expect(page.getByTestId('browse-count')).toHaveText(`すべての時代 ${core.length} 件`);
       await expect(page.getByTestId('browse-row')).toHaveCount(core.length);
       await expect(page.getByRole('checkbox', { name: '縄文', exact: true })).toHaveCount(0);
+      await page.getByRole('checkbox', { name: '令和', exact: true }).check();
+      await expect(page.getByTestId('browse-count')).toHaveText('ありません');
+      await expect(page.getByTestId('browse-row')).toHaveCount(0);
+      await expect(page.locator('.browse-heading')).toHaveCount(0);
+      await page.getByRole('checkbox', { name: '令和', exact: true }).uncheck();
       await radio(page, 'すべて').check();
       await expect(page.getByTestId('browse-row')).toHaveCount(events.length);
       for (const era of ['平成', '昭和']) {

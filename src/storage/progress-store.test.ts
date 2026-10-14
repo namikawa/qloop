@@ -1,7 +1,15 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deckModel } from '../core/decks';
-import type { Attempt, Era, Event, Pattern, Session, Settings } from '../core/models';
+import type {
+  EnglishSettings,
+  Attempt,
+  Era,
+  Event,
+  Pattern,
+  Session,
+  Settings,
+} from '../core/models';
 import { generateReviewSession, needsReview, reviewCandidates } from '../core/review';
 import { summarizeStats } from '../core/stats';
 import { openDb, type QLoopDb, type StoredEventStats, type StoredSession } from './db';
@@ -1528,5 +1536,73 @@ describe('語彙の出題設定と記録', () => {
         expect.objectContaining({ eventId: 'jv-0002', pattern: 'wordChoice', correct: 0 }),
       ]),
     );
+  });
+});
+
+describe('英単語の出題設定と記録', () => {
+  it.each(['englishMeaningChoice', 'englishWordChoice', 'mixed'] as const)(
+    '%s のscopeを持たない設定を保存し、再読み込みする',
+    async (pattern) => {
+      const { store, db } = await createStore();
+      const settings: EnglishSettings = {
+        pattern,
+        count: 10,
+        range: { kind: 'categories', categories: ['STAGE2 Lesson 4', '現在は無いレッスン'] },
+      };
+      await store.saveSettings('english-words', settings);
+      expect(await db.get('meta', 'settings:english-words')).toEqual({
+        key: 'settings:english-words',
+        value: settings,
+      });
+      expect(store.getSettings('english-words', 'english')).toEqual(settings);
+      const reloaded = await createStore(db);
+      expect(reloaded.store.getSettings('english-words', 'english')).toEqual(settings);
+      if (pattern !== 'mixed')
+        expect(reloaded.store.getSettings('english-words', 'vocabulary')).toBeNull();
+    },
+  );
+  it('全範囲の初期設定を保存してscopeなしで読み出し、別の種類のパターンや範囲は受け付けない', async () => {
+    const { store, db } = await createStore();
+    const settings: EnglishSettings = { pattern: 'mixed', count: 10, range: { kind: 'all' } };
+    await store.saveSettings('english-words', settings);
+    expect((await createStore(db)).store.getSettings('english-words', 'english')).toEqual(settings);
+    expect(store.getSettings('unknown', 'english')).toBeNull();
+    await store.saveSettings('english-words', {
+      scope: 'all',
+      pattern: 'meaningChoice',
+      count: 10,
+      range: { kind: 'all' },
+    });
+    expect(store.getSettings('english-words', 'english')).toBeNull();
+    await store.saveSettings('english-words', {
+      scope: 'all',
+      pattern: 'mixed',
+      count: 10,
+      range: { kind: 'eras', eras: ['江戸'] },
+    });
+    expect(store.getSettings('english-words', 'english')).toBeNull();
+  });
+  it('両パターンの回答と範囲をIndexedDBから書き出して読み戻し、集計と履歴を保つ', async () => {
+    const source = await createStore();
+    const range = { kind: 'categories' as const, categories: ['STAGE2 Lesson 4'] };
+    const session = await source.store.startSession({
+      deckId: 'english-words',
+      mode: 'normal',
+      pattern: 'mixed',
+      range,
+      total: 2,
+    });
+    await answer(source.store, session.id, 'en-0001', 'englishMeaningChoice', false);
+    await answer(source.store, session.id, 'en-0001', 'englishWordChoice', true, true);
+    const exported = await source.store.exportData();
+    const target = await createStore();
+    await target.store.importData(JSON.parse(JSON.stringify(exported)));
+    expect(target.store.listEventStats()).toEqual(source.store.listEventStats());
+    expect(target.store.listSessions()).toEqual(source.store.listSessions());
+    expect((await target.store.exportData()).attempts.map((attempt) => attempt.pattern)).toEqual([
+      'englishMeaningChoice',
+      'englishWordChoice',
+    ]);
+    expect(target.store.listSessions()[0]).toMatchObject({ deckId: 'english-words', range });
   });
 });

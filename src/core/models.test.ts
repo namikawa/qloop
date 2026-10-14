@@ -7,6 +7,14 @@ describe('PATTERNS', () => {
   });
 });
 
-it('全種類のパターンに意味 4 択と言葉 4 択を含む', () => {
-  expect(PATTERNS).toEqual(['yearInput', 'yearChoice', 'choice', 'meaningChoice', 'wordChoice']);
+it('全種類のパターンに語彙と英単語の両形式を含む', () => {
+  expect(PATTERNS).toEqual([
+    'yearInput',
+    'yearChoice',
+    'choice',
+    'meaningChoice',
+    'wordChoice',
+    'englishMeaningChoice',
+    'englishWordChoice',
+  ]);
 });

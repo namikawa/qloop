@@ -2113,3 +2113,21 @@ button:disabled {
 .wrong-item:active {
   background: var(--color-surface-inset);
 }
+
+/* 本ごとのチップの小見出し。 */
+.chip-heading {
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-semibold);
+}
+
+.chip-group + .chip-group {
+  margin-top: var(--space-4);
+}
+
+.browse-count-number {
+  display: inline-block;
+  margin-left: var(--space-2);
+  white-space: nowrap;
+}

@@ -48,11 +48,26 @@ export const VOCABULARY_PATTERNS: readonly VocabularyPattern[] = Object.keys(
   VOCABULARY_PATTERN_KEYS,
 ) as VocabularyPattern[];
 
+/** 英単語の出題パターン（設計書 6.11 節）。 */
+export type EnglishPattern = 'englishMeaningChoice' | 'englishWordChoice';
+const ENGLISH_PATTERN_KEYS: Record<EnglishPattern, true> = {
+  englishMeaningChoice: true,
+  englishWordChoice: true,
+};
+export const ENGLISH_PATTERNS: readonly EnglishPattern[] = Object.keys(
+  ENGLISH_PATTERN_KEYS,
+) as EnglishPattern[];
+export type EnglishPatternMode = EnglishPattern | 'mixed';
+
 /** 全種類の教材の出題パターン。回答の記録と書き出しの検証で使う。 */
-export type Pattern = TimelinePattern | VocabularyPattern;
+export type Pattern = TimelinePattern | VocabularyPattern | EnglishPattern;
 
 /** 全種類の教材の出題パターン（書き出しファイルの検証で使う）。 */
-export const PATTERNS: readonly Pattern[] = [...TIMELINE_PATTERNS, ...VOCABULARY_PATTERNS];
+export const PATTERNS: readonly Pattern[] = [
+  ...TIMELINE_PATTERNS,
+  ...VOCABULARY_PATTERNS,
+  ...ENGLISH_PATTERNS,
+];
 
 /** 学習段階。CSV の `level` 列が空なら `中学`。 */
 export type Level = '中学' | '高校';
@@ -89,8 +104,8 @@ export interface Event extends Item {
   yearLabel: string | null;
 }
 
-/** 教材の種類（設計書 5 章の冒頭）。`timeline` = 年表、`vocabulary` = 語彙。 */
-export type DeckKind = 'timeline' | 'vocabulary';
+/** 教材の種類（設計書 5 章の冒頭）。`timeline` = 年表、`vocabulary` = 語彙、`english` = 英単語。 */
+export type DeckKind = 'timeline' | 'vocabulary' | 'english';
 
 /** 年表の教材。 */
 export interface TimelineDeck {
@@ -119,8 +134,28 @@ export interface VocabularyDeck {
   items: Word[];
 }
 
+/** 英単語（設計書 5.8 節）。全行が中学・基本データ。 */
+export interface EnglishWord extends Item {
+  word: string;
+  meaning: string;
+  pos: string | null;
+  book: string;
+  lesson: number;
+  level: '中学';
+  role: 'core';
+  similar: string[];
+}
+
+/** 英単語の教材。追加データは持たない。 */
+export interface EnglishDeck {
+  id: string;
+  kind: 'english';
+  name: string;
+  items: EnglishWord[];
+}
+
 /** 教材（生成物 `decks.json` の 1 要素）。`kind` で項目の型が決まる。 */
-export type Deck = TimelineDeck | VocabularyDeck;
+export type Deck = TimelineDeck | VocabularyDeck | EnglishDeck;
 
 /**
  * セッション開始時に選ぶ出題パターン（設計書 6.1 節の 3）。
@@ -142,9 +177,11 @@ export type TimelineRange =
 
 /** 語彙の出題範囲（設計書 6.8 節の 2）。 */
 export type VocabularyRange = { kind: 'all' } | { kind: 'categories'; categories: string[] };
+/** 英単語の出題範囲。categories の値は「STAGE2 Lesson 4」の形。 */
+export type EnglishRange = { kind: 'all' } | { kind: 'categories'; categories: string[] };
 
 /** 全種類の教材の出題範囲（設計書 5.4・5.6 節）。履歴と書き出しに保存する。 */
-export type Range = TimelineRange | VocabularyRange;
+export type Range = TimelineRange | VocabularyRange | EnglishRange;
 
 /** 1 セッションの問題数（設計書 6.1 節の 4）。`all` は適格な全件。 */
 export type QuestionCount = 10 | 20 | 'all';
@@ -178,11 +215,20 @@ export type VocabularyQuestion = {
   };
 }[VocabularyPattern];
 
+/** 英単語の 1 問（設計書 6.11 節）。 */
+export type EnglishQuestion = {
+  [P in EnglishPattern]: {
+    item: EnglishWord;
+    pattern: P;
+    choices: EnglishWord[];
+  };
+}[EnglishPattern];
+
 /**
  * 1 問（全種類の教材のもの）。どれも出題した項目 `item` とパターン `pattern` を持つ。
  * 問題列と選択肢はセッション開始時に確定し、画面では変えない（設計書 6.1 節の 6）。
  */
-export type Question = TimelineQuestion | VocabularyQuestion;
+export type Question = TimelineQuestion | VocabularyQuestion | EnglishQuestion;
 
 /** 回答の記録（IndexedDB の `attempts`。追記のみで、成績の正本）。 */
 export interface Attempt {
@@ -265,5 +311,12 @@ export interface VocabularySettings {
   range: VocabularyRange;
 }
 
+/** 英単語の出題設定。scope は持たない。 */
+export interface EnglishSettings {
+  pattern: EnglishPatternMode;
+  count: QuestionCount;
+  range: EnglishRange;
+}
+
 /** 教材ごとに保存する出題設定（設計書 5.4 節）。 */
-export type DeckSettings = Settings | VocabularySettings;
+export type DeckSettings = Settings | VocabularySettings | EnglishSettings;

@@ -2,8 +2,13 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildDeckFromCsv, DECK_DEFINITIONS } from './decks';
 import { generateYearChoices, isYearChoiceEligible, isYearInputEligible } from './quiz';
-import { VOCABULARY_PATTERNS } from './models';
+import { ENGLISH_PATTERNS, VOCABULARY_PATTERNS } from './models';
 import { buildQuestion, isEligibleFor } from './vocabulary';
+import {
+  buildQuestion as buildEnglishQuestion,
+  choiceDisplay,
+  distractorCandidates as englishCandidates,
+} from './english';
 import { mulberry32 } from './random';
 
 /** data/ にある実際の CSV が検証を通ること（データを編集した PR をこのテストで守る）。教材の定義の一覧から読む。 */
@@ -12,10 +17,12 @@ for (const definition of DECK_DEFINITIONS) {
     const dir = new URL(`../../data/decks/${definition.dir}/`, import.meta.url);
     const result = buildDeckFromCsv(definition, {
       core: readFileSync(new URL('core.csv', dir), 'utf8'),
-      pool: readFileSync(new URL('pool.csv', dir), 'utf8'),
+      ...(definition.hasPool !== false
+        ? { pool: readFileSync(new URL('pool.csv', dir), 'utf8') }
+        : {}),
     });
 
-    it('core.csv と pool.csv が検証を通る', () => {
+    it('教材の CSV が検証を通る', () => {
       expect(result.ok ? [] : result.errors).toEqual([]);
     });
 
@@ -90,6 +97,72 @@ for (const definition of DECK_DEFINITIONS) {
                 expect(word.similar).not.toContain(choice.id);
                 expect(choice.similar).not.toContain(word.id);
               }
+            }
+          }
+        }
+      });
+    }
+    if (definition.kind === 'english') {
+      it('否定文の意味も同じ答えとして扱い、意味と英単語の誤答から除く', () => {
+        expect(result.ok ? [] : result.errors).toEqual([]);
+        if (!result.ok || result.deck.kind !== 'english') return;
+        const { items } = result.deck;
+        const meaningsFor = (id: string) =>
+          englishCandidates(
+            items.find((item) => item.id === id)!,
+            'englishMeaningChoice',
+            items,
+          ).flatMap((group) => group.map((candidate) => candidate.meaning));
+        const wordsFor = (id: string) =>
+          englishCandidates(
+            items.find((item) => item.id === id)!,
+            'englishWordChoice',
+            items,
+          ).flatMap((group) => group.map((candidate) => candidate.word));
+        expect(meaningsFor('en-0040')).not.toContain('誰も…ない');
+        expect(meaningsFor('en-0038')).not.toContain('何も…ない');
+        for (const id of ['en-0041', 'en-0042']) {
+          expect(wordsFor(id)).not.toContain('anybody');
+        }
+        expect(wordsFor('en-0035')).not.toContain('anything');
+      });
+      it('84件の全行で両パターンの選択肢を作れ、表示が重複せず、誤答の除外規則を守る', () => {
+        expect(result.ok ? [] : result.errors).toEqual([]);
+        if (!result.ok || result.deck.kind !== 'english') return;
+        const { items } = result.deck;
+        expect(items).toHaveLength(84);
+        expect(items.map((item) => item.id)).toEqual(
+          Array.from({ length: 84 }, (_, i) => `en-${String(i + 1).padStart(4, '0')}`),
+        );
+        expect(
+          items.every(
+            (item) =>
+              item.book === 'STAGE2' &&
+              item.lesson === 4 &&
+              item.role === 'core' &&
+              item.level === '中学',
+          ),
+        ).toBe(true);
+        for (const item of items) {
+          for (const pattern of ENGLISH_PATTERNS) {
+            const allowed = new Set(
+              englishCandidates(item, pattern, items).flatMap((group) =>
+                group.map((candidate) => candidate.id),
+              ),
+            );
+            for (let seed = 0; seed < 20; seed++) {
+              const question = buildEnglishQuestion(item, pattern, items, 2026, mulberry32(seed));
+              expect(question.choices, item.id).toHaveLength(4);
+              expect(question.choices).toContain(item);
+              expect(
+                new Set(question.choices.map((choice) => choiceDisplay(choice, pattern))).size,
+                item.id,
+              ).toBe(4);
+              expect(
+                question.choices
+                  .filter((choice) => choice !== item)
+                  .every((choice) => allowed.has(choice.id)),
+              ).toBe(true);
             }
           }
         }

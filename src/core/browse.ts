@@ -49,18 +49,17 @@ export function browseGroups<I extends Item>(
   });
 }
 
-export function browseCountText(
+export function browseRangeText(
   groupLabel: string,
   orderedGroups: readonly string[],
   selected: readonly string[],
-  count: number,
+  formatSelected?: (selected: readonly string[]) => string,
 ): string {
-  if (count === 0) return 'ありません';
-  const range =
-    selected.length === 0
+  return formatSelected
+    ? formatSelected(selected)
+    : selected.length === 0
       ? `すべての${groupLabel}`
       : orderedGroups.filter((group) => selected.includes(group)).join('・');
-  return `${range} ${count} 件`;
 }
 
 /** 複数パターンの候補にも札は項目ごとに 1 つだけ付ける。 */

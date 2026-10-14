@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import type { Event, Question, Session, VocabularyQuestion } from '../../core/models';
+import type { Event, Question, Session } from '../../core/models';
+import { meaningWithPos } from '../../core/english';
 import { answeredRatio, progressSteps, type AnswerOutcome } from '../../core/progress';
 import { isCorrectYear } from '../../core/quiz';
 import {
@@ -133,6 +134,7 @@ export function Quiz({ store, session, questions, onFinish }: QuizProps) {
     }
     setIndex(index + 1);
     setJudgement(null);
+    window.scrollTo(0, 0);
   };
 
   const endNow = async () => {
@@ -266,8 +268,47 @@ function QuestionBody({ question, judgement, disabled, onAnswer, onGiveUp }: Que
     case 'meaningChoice':
     case 'wordChoice':
       return (
-        <VocabularyChoiceQuestion
-          question={question}
+        <WordChoiceQuestion
+          answerId={question.item.id}
+          prompt={
+            question.pattern === 'meaningChoice'
+              ? 'どんな意味？'
+              : `この意味の${question.item.category}は？`
+          }
+          cardText={
+            question.pattern === 'meaningChoice' ? question.item.word : question.item.meaning
+          }
+          largeWord={question.pattern === 'meaningChoice'}
+          choices={question.choices.map((choice) => ({
+            id: choice.id,
+            text: question.pattern === 'meaningChoice' ? choice.meaning : choice.word,
+          }))}
+          testId="vocabulary-choice"
+          judgement={judgement}
+          disabled={disabled}
+          onAnswer={(id) => onAnswer(id === question.item.id, id)}
+          onGiveUp={onGiveUp}
+        />
+      );
+    case 'englishMeaningChoice':
+    case 'englishWordChoice':
+      return (
+        <WordChoiceQuestion
+          answerId={question.item.id}
+          prompt={
+            question.pattern === 'englishMeaningChoice' ? 'どんな意味？' : 'この意味の英単語は？'
+          }
+          cardText={
+            question.pattern === 'englishMeaningChoice'
+              ? question.item.word
+              : meaningWithPos(question.item)
+          }
+          largeWord={question.pattern === 'englishMeaningChoice'}
+          choices={question.choices.map((choice) => ({
+            id: choice.id,
+            text: question.pattern === 'englishMeaningChoice' ? choice.meaning : choice.word,
+          }))}
+          testId="english-choice"
           judgement={judgement}
           disabled={disabled}
           onAnswer={(id) => onAnswer(id === question.item.id, id)}
@@ -297,7 +338,11 @@ function JudgementDetail({ question }: { question: Question }) {
       <p className="judgement-detail">読み {question.item.reading}</p>
     );
   }
-  if (question.pattern === 'choice') {
+  if (
+    question.pattern === 'choice' ||
+    question.pattern === 'englishMeaningChoice' ||
+    question.pattern === 'englishWordChoice'
+  ) {
     return null;
   }
   return (
@@ -537,35 +582,40 @@ function ChoiceQuestion({
   );
 }
 
-function VocabularyChoiceQuestion({
-  question,
+function WordChoiceQuestion({
+  answerId,
+  prompt,
+  cardText,
+  largeWord,
+  choices,
+  testId,
   judgement,
   disabled,
   onAnswer,
   onGiveUp,
 }: {
-  question: VocabularyQuestion;
+  answerId: string;
+  prompt: string;
+  cardText: string;
+  largeWord: boolean;
+  choices: readonly { id: string; text: string }[];
+  testId: string;
   judgement: Judgement | null;
   disabled: boolean;
   onAnswer: (id: string) => void;
   onGiveUp: () => void;
 }) {
-  const meaningChoice = question.pattern === 'meaningChoice';
   return (
     <div className="question vocabulary-question">
       <div className="card question-card">
-        <p className="question-prompt">
-          {meaningChoice ? 'どんな意味？' : `この意味の${question.item.category}は？`}
-        </p>
-        <p className={meaningChoice ? 'question-text vocabulary-word' : 'question-text'}>
-          {meaningChoice ? question.item.word : question.item.meaning}
-        </p>
+        <p className="question-prompt">{prompt}</p>
+        <p className={largeWord ? 'question-text vocabulary-word' : 'question-text'}>{cardText}</p>
       </div>
       <ul className="choices">
-        {question.choices.map((choice) => {
+        {choices.map((choice) => {
           const { className, badge } = settledChoice(
             judgement,
-            choice.id === question.item.id,
+            choice.id === answerId,
             choice.id === judgement?.chosen,
             'choice',
           );
@@ -574,11 +624,11 @@ function VocabularyChoiceQuestion({
               <button
                 type="button"
                 className={className}
-                data-testid="vocabulary-choice"
+                data-testid={testId}
                 disabled={judgement !== null || disabled}
                 onClick={() => onAnswer(choice.id)}
               >
-                <span className="choice-title">{meaningChoice ? choice.meaning : choice.word}</span>
+                <span className="choice-title">{choice.text}</span>
                 {badge !== null && <span className="choice-badge">{badge}</span>}
               </button>
             </li>

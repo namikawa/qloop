@@ -12,7 +12,7 @@ for (const width of [375, 402]) {
   test.describe(`ホームの教材のカード（幅 ${width}px）`, () => {
     test.use({ viewport: { width, height: 667 } });
 
-    test('両教材で切り替えから成績までがカードに入り、連続学習日数はロゴの右にあり、1 画面に収まる', async ({
+    test('全教材で切り替えから成績までがカードに入り、連続学習日数はロゴの右にあり、1 画面に収まる', async ({
       page,
     }) => {
       await page.addInitScript(() => {
@@ -23,17 +23,17 @@ for (const width of [375, 402]) {
       const deck = page.locator('section.deck');
       const streak = page.getByTestId('home-streak');
       await expect(streak).toBeVisible();
-      for (const name of ['日本史年表', '語彙']) {
+      for (const name of ['日本史年表', '語彙', '英単語']) {
         await radio(page, name).check();
         await expect(deck.getByRole('group', { name: '教材', exact: true })).toBeVisible();
-        await expect(deck.getByRole('radio')).toHaveCount(2);
+        await expect(deck.getByRole('radio')).toHaveCount(3);
         await expect(deck.getByRole('heading', { level: 2, name, exact: true })).toBeVisible();
         await expect(deck.getByTestId('target-count')).toContainText(
-          name === '語彙' ? '言葉' : '出来事',
+          name === '英単語' ? '英単語' : name === '語彙' ? '言葉' : '出来事',
         );
         for (const action of [
           '出題',
-          name === '語彙' ? '言葉を覚える' : '年表を覚える',
+          name === '英単語' ? '英単語を覚える' : name === '語彙' ? '言葉を覚える' : '年表を覚える',
           '復習',
           '成績',
         ]) {

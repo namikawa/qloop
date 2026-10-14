@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { availableBrowseGroups, browseCountText, browseGroups, browseReviewIds } from './browse';
+import { availableBrowseGroups, browseRangeText, browseGroups, browseReviewIds } from './browse';
 import {
   buildDeckFromCsv,
   deckModel,
@@ -166,17 +166,13 @@ it('隠す選択肢は年表が年・出来事、語彙が意味・言葉の順'
   ]);
 });
 
-it('件数の行は全体・選択した範囲（表の順）・0 件を表す', () => {
-  expect(browseCountText('時代', TIMELINE_RULES.groups, [], 371)).toBe('すべての時代 371 件');
-  expect(browseCountText('時代', TIMELINE_RULES.groups, ['平成', '昭和'], 91)).toBe(
-    '昭和・平成 91 件',
+it('範囲の文字は全体・選択した範囲を表の順で表す', () => {
+  expect(browseRangeText('時代', TIMELINE_RULES.groups, [])).toBe('すべての時代');
+  expect(browseRangeText('時代', TIMELINE_RULES.groups, ['平成', '昭和'])).toBe('昭和・平成');
+  expect(browseRangeText('種類', VOCABULARY_RULES.groups, [])).toBe('すべての種類');
+  expect(browseRangeText('種類', ['慣用句', 'ことわざ'], ['ことわざ', '慣用句'])).toBe(
+    '慣用句・ことわざ',
   );
-  expect(browseCountText('種類', VOCABULARY_RULES.groups, [], 314)).toBe('すべての種類 314 件');
-  expect(browseCountText('種類', ['慣用句', 'ことわざ'], ['ことわざ', '慣用句'], 10)).toBe(
-    '慣用句・ことわざ 10 件',
-  );
-  expect(browseCountText('時代', TIMELINE_RULES.groups, ['縄文'], 0)).toBe('ありません');
-  expect(browseCountText('種類', VOCABULARY_RULES.groups, [], 0)).toBe('ありません');
 });
 
 it('復習の候補はホームと同じ入力で、複数のパターンでも項目の札は 1 つ', () => {
@@ -210,7 +206,9 @@ for (const definition of DECK_DEFINITIONS) {
     const dir = new URL(`../../data/decks/${definition.dir}/`, import.meta.url);
     const result = buildDeckFromCsv(definition, {
       core: readFileSync(new URL('core.csv', dir), 'utf8'),
-      pool: readFileSync(new URL('pool.csv', dir), 'utf8'),
+      ...(definition.hasPool !== false
+        ? { pool: readFileSync(new URL('pool.csv', dir), 'utf8') }
+        : {}),
     });
     it('母集団の全項目が 1 回ずつ出て、高校の項目は出ない', () => {
       expect(result.ok ? [] : result.errors).toEqual([]);

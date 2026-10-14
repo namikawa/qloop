@@ -220,9 +220,11 @@ export function Home({
             <span className="nowrap">
               出題できる{labels.item} {targetCount} 件
             </span>
-            <span className="nowrap">
-              （{labels.core} {coreCount} 件）
-            </span>
+            {labels.core !== null && (
+              <span className="nowrap">
+                （{labels.core} {coreCount} 件）
+              </span>
+            )}
           </p>
           <button
             type="button"

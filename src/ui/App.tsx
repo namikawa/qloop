@@ -11,6 +11,7 @@ import { openDb, requestPersistentStorage } from '../storage/db';
 import { ProgressStore } from '../storage/progress-store';
 import { describeError } from './errors';
 import { Browse } from './screens/Browse';
+import { EnglishQuizSetup } from './screens/EnglishQuizSetup';
 import { Home, type StoreStatus } from './screens/Home';
 import { Quiz, type QuizResult } from './screens/Quiz';
 import { QuizSetup } from './screens/QuizSetup';
@@ -115,6 +116,14 @@ export function App() {
         onStart={startQuiz}
         onBack={goHome}
       />
+    ) : current.kind === 'english' ? (
+      <EnglishQuizSetup
+        store={store}
+        model={current}
+        deckName={deckName}
+        onStart={startQuiz}
+        onBack={goHome}
+      />
     ) : (
       <VocabularyQuizSetup
         store={store}
@@ -167,7 +176,9 @@ export function App() {
     const savedScope =
       current.kind === 'timeline'
         ? store.getSettings(deck.id)?.scope
-        : store.getSettings(deck.id, 'vocabulary')?.scope;
+        : current.kind === 'vocabulary'
+          ? store.getSettings(deck.id, 'vocabulary')?.scope
+          : 'all';
     const item = current.population.find((item) => item.id === view.highlightId);
     return (
       <Browse<Question['item'], Pattern>
@@ -176,7 +187,9 @@ export function App() {
         population={current.population}
         allItems={deck.items}
         rules={rules}
-        initialScope={item?.role === 'pool' ? 'all' : (savedScope ?? 'core')}
+        initialScope={
+          rules.labels.core === null || item?.role === 'pool' ? 'all' : (savedScope ?? 'core')
+        }
         highlightId={view.highlightId}
         fromResult={view.returnTo.screen === 'result'}
         onBack={() => setView(view.returnTo)}

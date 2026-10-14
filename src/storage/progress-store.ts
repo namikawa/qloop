@@ -3,6 +3,8 @@ import { localDateKey } from '../core/date';
 import type {
   Attempt,
   DeckSettings,
+  DeckKind,
+  EnglishSettings,
   VocabularySettings,
   EventStats,
   Pattern,
@@ -294,10 +296,22 @@ export class ProgressStore {
    */
   getSettings(deckId: string, kind?: 'timeline'): Settings | null;
   getSettings(deckId: string, kind: 'vocabulary'): VocabularySettings | null;
-  getSettings(deckId: string, kind: 'timeline' | 'vocabulary' = 'timeline'): DeckSettings | null {
+  getSettings(deckId: string, kind: 'english'): EnglishSettings | null;
+  getSettings(deckId: string, kind: DeckKind = 'timeline'): DeckSettings | null {
     const settings =
       this.settings.get(deckId) ?? (deckId === LEGACY_DECK_ID ? this.legacySettings : null);
     if (settings === null) return null;
+    if (kind === 'english') {
+      if (
+        (settings.pattern === 'englishMeaningChoice' ||
+          settings.pattern === 'englishWordChoice' ||
+          settings.pattern === 'mixed') &&
+        (settings.range.kind === 'all' || settings.range.kind === 'categories')
+      ) {
+        return { pattern: settings.pattern, count: settings.count, range: settings.range };
+      }
+      return null;
+    }
     if (kind === 'vocabulary') {
       if (
         (settings.pattern === 'meaningChoice' ||
@@ -478,7 +492,7 @@ function settingsKey(deckId: string): SettingsKey {
 
 /** 保存された出題設定を読む。`scope` が無い（PR 3 より前の）設定は `core` とみなす。 */
 function normalizeSettings<T extends StoredDeckSettings>(stored: T): T & { scope: 'core' | 'all' } {
-  return { ...stored, scope: stored.scope === 'all' ? 'all' : 'core' };
+  return { ...stored, scope: 'scope' in stored && stored.scope === 'all' ? 'all' : 'core' };
 }
 
 /** 保存されたセッションを読む。`deckId` が無い（1.0 の）セッションは日本史年表（`LEGACY_DECK_ID`）とみなす。 */
