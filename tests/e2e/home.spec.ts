@@ -31,7 +31,12 @@ for (const width of [375, 402]) {
         await expect(deck.getByTestId('target-count')).toContainText(
           name === '語彙' ? '言葉' : '出来事',
         );
-        for (const action of ['出題', name === '語彙' ? '言葉の一覧' : '年表', '復習', '成績']) {
+        for (const action of [
+          '出題',
+          name === '語彙' ? '言葉を覚える' : '年表を覚える',
+          '復習',
+          '成績',
+        ]) {
           await expect(deck.getByRole('button', { name: action, exact: true })).toBeEnabled();
         }
         await expect(deck.getByTestId('home-streak')).toHaveCount(0);

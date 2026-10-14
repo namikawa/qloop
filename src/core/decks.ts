@@ -139,7 +139,7 @@ const TIMELINE_PATTERN_LABELS: Readonly<Record<TimelinePatternMode, string>> = {
 export const TIMELINE_RULES: KindRules<Event, TimelinePattern> = {
   kind: 'timeline',
   browse: {
-    name: '年表',
+    name: '年表を覚える',
     layout: 'inline',
     hideOptions: [
       { value: 'front', label: '年' },
@@ -178,7 +178,7 @@ const VOCABULARY_PATTERN_LABELS: Readonly<Record<VocabularyPatternMode, string>>
 export const VOCABULARY_RULES: KindRules<Word, VocabularyPattern> = {
   kind: 'vocabulary',
   browse: {
-    name: '言葉の一覧',
+    name: '言葉を覚える',
     layout: 'stacked',
     hideOptions: [
       { value: 'back', label: '意味' },

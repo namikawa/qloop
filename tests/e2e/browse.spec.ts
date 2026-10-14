@@ -50,9 +50,9 @@ for (const width of [375, 402]) {
       const events = populationOf(readDeckEvents());
       const core = events.filter((item) => item.role === 'core');
       await page.goto('/');
-      await page.getByRole('button', { name: '年表', exact: true }).click();
+      await page.getByRole('button', { name: '年表を覚える', exact: true }).click();
       await expect(
-        page.getByRole('heading', { level: 1, name: '年表', exact: true }),
+        page.getByRole('heading', { level: 1, name: '年表を覚える', exact: true }),
       ).toBeVisible();
       await expect(page.locator('.screen-deck')).toHaveText('日本史年表');
       await expect(radio(page, '基本の年表のみ')).toBeChecked();
@@ -96,7 +96,7 @@ for (const width of [375, 402]) {
       await expectNoHorizontalScroll(page);
 
       await page.getByRole('button', { name: '戻る', exact: true }).click();
-      await page.getByRole('button', { name: '年表', exact: true }).click();
+      await page.getByRole('button', { name: '年表を覚える', exact: true }).click();
       await expect(radio(page, '基本の年表のみ')).toBeChecked();
       await expect(radio(page, '隠さない')).toBeChecked();
       await expect(page.locator('.chip input:checked')).toHaveCount(0);
@@ -109,7 +109,7 @@ for (const width of [375, 402]) {
       await expect(radio(page, '基本の年表のみ')).toBeChecked();
     });
 
-    test('言葉の一覧で言葉と読みを隠し、押して出す・隠す・初期化する', async ({ page }) => {
+    test('言葉を覚える画面で言葉と読みを隠し、押して出す・隠す・初期化する', async ({ page }) => {
       const deck = readDeck('vocabulary');
       if (deck.kind !== 'vocabulary') throw new Error('語彙の教材ではありません');
       const words = deck.items.filter((item) => item.level === '中学');
@@ -117,8 +117,8 @@ for (const width of [375, 402]) {
       const item = core.find((item) => item.reading !== null)!;
       await page.goto('/');
       await radio(page, '語彙').check();
-      await page.getByRole('button', { name: '言葉の一覧', exact: true }).click();
-      await expect(page.getByRole('heading', { name: '言葉の一覧', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: '言葉を覚える', exact: true }).click();
+      await expect(page.getByRole('heading', { name: '言葉を覚える', exact: true })).toBeVisible();
       await expect(page.locator('.screen-deck')).toHaveText('語彙');
       await expect(page.getByTestId('browse-count')).toHaveText(`すべての種類 ${core.length} 件`);
       await radio(page, 'すべて').check();
@@ -144,7 +144,7 @@ for (const width of [375, 402]) {
       await expect(row.locator('.browse-back')).toHaveText(item.meaning);
       await expectNoHorizontalScroll(page);
       await page.getByRole('button', { name: '戻る', exact: true }).click();
-      await page.getByRole('button', { name: '言葉の一覧', exact: true }).click();
+      await page.getByRole('button', { name: '言葉を覚える', exact: true }).click();
       await expect(radio(page, '基本の語彙のみ')).toBeChecked();
       await expect(radio(page, '隠さない')).toBeChecked();
       await expect(page.locator('.chip input:checked')).toHaveCount(0);
@@ -267,7 +267,9 @@ for (const kind of ['timeline', 'vocabulary'] as const) {
     }
     await expect(page.getByTestId('result-score')).toHaveText('0 / 10');
     const last = page.getByTestId('wrong-list').getByRole('button').last();
-    await last.scrollIntoViewIfNeeded();
+    // 下の帯に隠れた行は、押す前に Playwright が画面を送り直して記録とずれるので、
+    // 中央へ送ってから位置を記録する（下のループも同じ）
+    await last.evaluate((element) => element.scrollIntoView({ block: 'center' }));
     const title = await last.locator('.wrong-title').textContent();
     const item = pairs.find(({ item }) => rules.itemTitle(item) === title)!.item;
     const before = await page.evaluate(() => window.scrollY);
@@ -306,7 +308,9 @@ for (const kind of ['timeline', 'vocabulary'] as const) {
       });
     await expect(duplicates).toHaveCount(2);
     for (let index = 0; index < 2; index++) {
-      await duplicates.nth(index).scrollIntoViewIfNeeded();
+      await duplicates
+        .nth(index)
+        .evaluate((element) => element.scrollIntoView({ block: 'center' }));
       const scrollY = await page.evaluate(() => window.scrollY);
       await duplicates.nth(index).click();
       const row = itemRow(page, target.id);
@@ -326,7 +330,10 @@ for (const kind of ['timeline', 'vocabulary'] as const) {
     }
     await page.getByRole('button', { name: 'ホームへ', exact: true }).click();
     await page
-      .getByRole('button', { name: kind === 'timeline' ? '年表' : '言葉の一覧', exact: true })
+      .getByRole('button', {
+        name: kind === 'timeline' ? '年表を覚える' : '言葉を覚える',
+        exact: true,
+      })
       .click();
     await expect(
       radio(page, kind === 'timeline' ? '基本の年表のみ' : '基本の語彙のみ'),
