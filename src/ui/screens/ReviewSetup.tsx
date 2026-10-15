@@ -5,7 +5,7 @@ import type { ProgressStore } from '../../storage/progress-store';
 import { BottomBar } from '../components/BottomBar';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { Segmented } from '../components/Segmented';
-import { COUNT_OPTIONS } from './QuizSetup';
+import { COUNT_OPTIONS } from '../components/quiz-options';
 
 interface ReviewSetupProps<I extends Item, P extends Pattern> {
   store: ProgressStore;

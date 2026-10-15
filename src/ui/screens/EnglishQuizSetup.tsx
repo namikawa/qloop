@@ -14,12 +14,13 @@ import {
   generateSession,
   normalizeEnglishSettings,
 } from '../../core/english';
-import { GroupChips } from './VocabularyQuizSetup';
+import { GroupChips } from '../components/GroupChips';
 import type { ProgressStore } from '../../storage/progress-store';
 import { BottomBar } from '../components/BottomBar';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { Segmented } from '../components/Segmented';
-import { COUNT_OPTIONS, PatternField } from './QuizSetup';
+import { PatternField } from '../components/PatternField';
+import { COUNT_OPTIONS } from '../components/quiz-options';
 
 /** 保存した設定が無いときの初期値（設計書 6.4 節の 1・6.11 節の 4）。 */
 const DEFAULT_SETTINGS: EnglishSettings = {

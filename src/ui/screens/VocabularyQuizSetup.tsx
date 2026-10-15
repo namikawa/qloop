@@ -13,10 +13,11 @@ import { filterByScope } from '../../core/quiz';
 import { eligibleQuestions, filterByRange, generateSession } from '../../core/vocabulary';
 import type { ProgressStore } from '../../storage/progress-store';
 import { BottomBar } from '../components/BottomBar';
-import { CheckIcon } from '../components/icons';
+import { GroupChips } from '../components/GroupChips';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { Segmented } from '../components/Segmented';
-import { COUNT_OPTIONS, PatternField } from './QuizSetup';
+import { PatternField } from '../components/PatternField';
+import { COUNT_OPTIONS } from '../components/quiz-options';
 
 /** 保存した設定が無いときの初期値（設計書 6.4 節の 1・6.8 節の 4）。 */
 const DEFAULT_SETTINGS: VocabularySettings = {
@@ -204,44 +205,4 @@ export function VocabularyQuizSetup({
       </BottomBar>
     </div>
   );
-}
-
-/** 本の見出しと単位のチップ。見出しの無い教材では従来のチップだけを並べる。 */
-export function GroupChips({
-  groups,
-  groupHeading,
-  groupChipLabel,
-  selected,
-  onToggle,
-}: {
-  groups: readonly string[];
-  groupHeading: (group: string) => string | null;
-  groupChipLabel: (group: string) => string;
-  selected: readonly string[];
-  onToggle: (group: string) => void;
-}) {
-  const headings = [...new Set(groups.map(groupHeading))];
-  return headings.map((heading) => (
-    <div className="chip-group" key={heading ?? ''}>
-      {heading !== null && <h3 className="chip-heading">{heading}</h3>}
-      <div className="chip-options">
-        {groups
-          .filter((group) => groupHeading(group) === heading)
-          .map((group) => (
-            <label key={group} className="chip">
-              <input
-                type="checkbox"
-                className="overlay-input"
-                checked={selected.includes(group)}
-                onChange={() => onToggle(group)}
-              />
-              <span className="chip-label">
-                <CheckIcon className="chip-check" />
-                {groupChipLabel(group)}
-              </span>
-            </label>
-          ))}
-      </div>
-    </div>
-  ));
 }

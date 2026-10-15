@@ -15,7 +15,9 @@ import { eligibleQuestions, filterByScope, generateSession } from '../../core/qu
 import { filterByRange, parseRangeYear, validateRange } from '../../core/range';
 import type { ProgressStore } from '../../storage/progress-store';
 import { BottomBar } from '../components/BottomBar';
-import { CheckCircleIcon, CheckIcon } from '../components/icons';
+import { CheckIcon } from '../components/icons';
+import { PatternField } from '../components/PatternField';
+import { COUNT_OPTIONS } from '../components/quiz-options';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { Segmented } from '../components/Segmented';
 
@@ -36,13 +38,6 @@ const PATTERN_DESCRIPTIONS: Readonly<Record<TimelinePatternMode, string>> = {
   choice: '4 つの出来事から選ぶ',
   mixed: '3 つの形式をまぜる',
 };
-
-/** 問題数の選択肢（出題設定と復習で共通）。 */
-export const COUNT_OPTIONS: { value: QuestionCount; label: string }[] = [
-  { value: 10, label: '10 問' },
-  { value: 20, label: '20 問' },
-  { value: 'all', label: '全問' },
-];
 
 const RANGE_OPTIONS: { value: TimelineRange['kind']; label: string }[] = [
   { value: 'all', label: '全範囲' },
@@ -282,52 +277,6 @@ export function QuizSetup({ store, model, deckName, onStart, onBack }: QuizSetup
         </div>
       </BottomBar>
     </div>
-  );
-}
-
-interface PatternFieldProps<P extends string> {
-  options: readonly { value: P; label: string; description: string }[];
-  value: P;
-  onChange: (value: P) => void;
-}
-
-/**
- * 出題パターンの選択（2 列のカード）。ラジオボタンの名前はパターン名だけにし、説明は aria-describedby で添える。
- */
-export function PatternField<P extends string>({ options, value, onChange }: PatternFieldProps<P>) {
-  const idPrefix = useId();
-  return (
-    <fieldset className="field">
-      <legend className="field-legend">出題パターン</legend>
-      <div className="pattern-options">
-        {options.map((option) => {
-          const inputId = `${idPrefix}-${option.value}`;
-          const descriptionId = `${inputId}-description`;
-          return (
-            <div key={option.value} className="pattern-option">
-              <input
-                id={inputId}
-                type="radio"
-                className="overlay-input"
-                name="pattern"
-                checked={value === option.value}
-                aria-describedby={descriptionId}
-                onChange={() => onChange(option.value)}
-              />
-              <div className="pattern-card">
-                <label htmlFor={inputId} className="pattern-name">
-                  {option.label}
-                </label>
-                <span id={descriptionId} className="pattern-desc">
-                  {option.description}
-                </span>
-                <CheckCircleIcon className="pattern-check" />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </fieldset>
   );
 }
 

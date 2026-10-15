@@ -23,6 +23,7 @@ import {
   type SettingsKey,
   type StoredSession,
   type StoredDeckSettings,
+  type StoredEventStats,
 } from './db';
 import { EXPORT_SCHEMA_VERSION, parseProgressExport, type ProgressExport } from './transfer';
 
@@ -67,6 +68,19 @@ function defaultNewId(): string {
 
 function statsKey(eventId: string, pattern: Pattern): string {
   return `${pattern}:${eventId}`;
+}
+
+function nextEventStats(previous: StoredEventStats | undefined, attempt: Attempt): EventStats {
+  return {
+    eventId: attempt.eventId,
+    pattern: attempt.pattern,
+    attempts: (previous?.attempts ?? 0) + 1,
+    correct: (previous?.correct ?? 0) + (attempt.correct ? 1 : 0),
+    lastAnsweredAt: attempt.answeredAt,
+    lastCorrect: attempt.correct,
+    lastWrongAt: attempt.correct ? (previous?.lastWrongAt ?? null) : attempt.answeredAt,
+    consecutiveCorrect: attempt.correct ? (previous?.consecutiveCorrect ?? 0) + 1 : 0,
+  };
 }
 
 /**
@@ -228,16 +242,7 @@ export class ProgressStore {
         answeredAt,
         sessionId: input.sessionId,
       };
-      const stats: EventStats = {
-        eventId: input.eventId,
-        pattern: input.pattern,
-        attempts: (previous?.attempts ?? 0) + 1,
-        correct: (previous?.correct ?? 0) + (input.correct ? 1 : 0),
-        lastAnsweredAt: answeredAt,
-        lastCorrect: input.correct,
-        lastWrongAt: input.correct ? (previous?.lastWrongAt ?? null) : answeredAt,
-        consecutiveCorrect: input.correct ? (previous?.consecutiveCorrect ?? 0) + 1 : 0,
-      };
+      const stats = nextEventStats(previous, attempt);
       const nextSession: Session = {
         ...session,
         answered: session.answered + 1,
@@ -523,16 +528,7 @@ function deriveProgress(
   for (const attempt of attempts) {
     const key = statsKey(attempt.eventId, attempt.pattern);
     const previous = stats.get(key);
-    stats.set(key, {
-      eventId: attempt.eventId,
-      pattern: attempt.pattern,
-      attempts: (previous?.attempts ?? 0) + 1,
-      correct: (previous?.correct ?? 0) + (attempt.correct ? 1 : 0),
-      lastAnsweredAt: attempt.answeredAt,
-      lastCorrect: attempt.correct,
-      lastWrongAt: attempt.correct ? (previous?.lastWrongAt ?? null) : attempt.answeredAt,
-      consecutiveCorrect: attempt.correct ? (previous?.consecutiveCorrect ?? 0) + 1 : 0,
-    });
+    stats.set(key, nextEventStats(previous, attempt));
     const count = counts.get(attempt.sessionId) ?? { answered: 0, correct: 0 };
     counts.set(attempt.sessionId, {
       answered: count.answered + 1,

@@ -14,7 +14,7 @@ import { BottomBar } from '../components/BottomBar';
 import { ChevronUpIcon } from '../components/icons';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { Segmented } from '../components/Segmented';
-import { GroupChips } from './VocabularyQuizSetup';
+import { GroupChips } from '../components/GroupChips';
 
 interface BrowseProps<I extends Item, P extends Pattern> {
   store: ProgressStore;

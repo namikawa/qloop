@@ -691,6 +691,93 @@ const byId = <T extends { id: string }>(sessions: T[]) =>
   [...sessions].sort((a, b) => a.id.localeCompare(b.id));
 
 describe('ProgressStore.rebuild', () => {
+  it('同時刻・時計逆行を含む通常保存と再計算・読み込みで、教材別・パターン別の集計と履歴が一致する', async () => {
+    const source = await createStore();
+    const history = await source.store.startSession({ ...NORMAL, total: 6 });
+    await answer(source.store, history.id, 'jh-0001', 'yearInput', true);
+    await answer(source.store, history.id, 'jh-0001', 'yearInput', true);
+    await answer(source.store, history.id, 'jh-0001', 'choice', false);
+    advance(2 * DAY);
+    await answer(source.store, history.id, 'jh-0001', 'yearInput', false);
+    advance(-DAY);
+    await answer(source.store, history.id, 'jh-0001', 'yearInput', true);
+    await answer(source.store, history.id, 'jh-0001', 'yearInput', true, true);
+    const other = await source.store.startSession({
+      ...NORMAL,
+      deckId: 'test-history',
+      total: 2,
+    });
+    await answer(source.store, other.id, 'th-0001', 'yearInput', true);
+    advance(2 * DAY);
+    await answer(source.store, other.id, 'th-0001', 'yearInput', false, true);
+
+    const snapshot = async ({ store, db }: { store: ProgressStore; db: QLoopDb }) => ({
+      memory: {
+        stats: byKey(store.listEventStats()),
+        sessions: byId(store.listSessions()),
+        studyDays: store.getStudyDays(),
+      },
+      stored: {
+        stats: byKey(await db.getAll('eventStats')),
+        sessions: byId(await db.getAll('sessions')),
+        studyDays: (await db.get('meta', 'studyDays'))?.value,
+      },
+    });
+    const expected = await snapshot(source);
+    expect(expected.memory).toEqual(expected.stored);
+    expect(expected.memory.stats).toEqual([
+      {
+        eventId: 'jh-0001',
+        pattern: 'choice',
+        attempts: 1,
+        correct: 0,
+        lastAnsweredAt: '2026-10-11T01:00:00.000Z',
+        lastCorrect: false,
+        lastWrongAt: '2026-10-11T01:00:00.000Z',
+        consecutiveCorrect: 0,
+      },
+      {
+        eventId: 'jh-0001',
+        pattern: 'yearInput',
+        attempts: 5,
+        correct: 4,
+        lastAnsweredAt: '2026-10-12T01:00:00.000Z',
+        lastCorrect: true,
+        lastWrongAt: '2026-10-13T01:00:00.000Z',
+        consecutiveCorrect: 2,
+      },
+      {
+        eventId: 'th-0001',
+        pattern: 'yearInput',
+        attempts: 2,
+        correct: 1,
+        lastAnsweredAt: '2026-10-14T01:00:00.000Z',
+        lastCorrect: false,
+        lastWrongAt: '2026-10-14T01:00:00.000Z',
+        consecutiveCorrect: 0,
+      },
+    ]);
+    expect(expected.memory.sessions).toMatchObject([
+      { id: history.id, deckId: HISTORY, answered: 6, correct: 4 },
+      { id: other.id, deckId: 'test-history', answered: 2, correct: 1 },
+    ]);
+    expect(expected.memory.studyDays).toEqual([
+      '2026-10-11',
+      '2026-10-12',
+      '2026-10-13',
+      '2026-10-14',
+    ]);
+
+    const exported = await source.store.exportData();
+    await source.store.rebuild();
+    expect(await snapshot(source)).toEqual(expected);
+
+    dbName = `${dbName}-target`;
+    const target = await createStore();
+    await target.store.importData(JSON.parse(JSON.stringify(exported)));
+    expect(await snapshot(target)).toEqual(expected);
+  });
+
   it('連続正解数は時刻順でなく attempts の記録した順に数え、パターンごとに不正解で 0 に戻す', async () => {
     const { store, db } = await createStore();
     const session = await store.startSession(NORMAL);
