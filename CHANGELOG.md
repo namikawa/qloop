@@ -1,5 +1,11 @@
 # 変更履歴
 
+## [1.3.1] - 2026-10-15
+
+### 追加
+
+- 英単語の STAGE2 Lesson 5（97 件）。出題できる英単語が 181 件になる
+
 ## [1.3.0] - 2026-10-15
 
 ### 追加
@@ -66,6 +72,7 @@
 - ホーム画面の「アプリを更新」で、新しい版を探して切り替える
 - 年表のデータ: 出題できる出来事 371 件（うち基本の年表 129 件）
 
+[1.3.1]: https://github.com/namikawa/qloop/releases/tag/v1.3.1
 [1.3.0]: https://github.com/namikawa/qloop/releases/tag/v1.3.0
 [1.2.0]: https://github.com/namikawa/qloop/releases/tag/v1.2.0
 [1.1.2]: https://github.com/namikawa/qloop/releases/tag/v1.1.2
