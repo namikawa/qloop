@@ -247,7 +247,7 @@ button:disabled {
   line-height: 1.4;
 }
 
-/* 項目名（時代別・記録の管理・間違えた出来事） */
+/* 項目名（時代別・間違えた出来事） */
 .section-label {
   margin: var(--space-6) 0 var(--space-2);
   font-size: var(--font-size-label);
@@ -329,7 +329,7 @@ button:disabled {
   background: var(--color-surface-inset);
 }
 
-/* 文字だけのボタン（終了・アプリを更新） */
+/* 文字だけのボタン（終了・アプリを更新・記録の管理） */
 .button-text {
   display: inline-flex;
   align-items: center;
@@ -899,7 +899,7 @@ button:disabled {
   font-size: var(--font-size-sub);
 }
 
-/* 版の表示と「アプリを更新」を横に並べる（狭い画面では折り返す） */
+/* 版の表示と「アプリを更新」「記録の管理」を横に並べる（狭い画面では折り返す） */
 .footer-row {
   display: flex;
   flex-wrap: wrap;
@@ -1641,6 +1641,10 @@ button:disabled {
   height: 100%;
   border-radius: 4px;
   background: var(--color-primary);
+}
+
+.records-screen .hint {
+  margin: 0 0 var(--space-4);
 }
 
 .records {

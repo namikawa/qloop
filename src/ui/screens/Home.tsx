@@ -40,6 +40,7 @@ interface HomeProps {
   onStartQuiz: () => void;
   onStartReview: () => void;
   onOpenStats: () => void;
+  onOpenRecords: () => void;
   browseName: string;
   onOpenBrowse: () => void;
   installBannerVisible: boolean;
@@ -61,13 +62,17 @@ const UPDATE_CHECK_MESSAGES: Record<UpdateCheckStatus, string> = {
   failed: '確認できませんでした。通信できる場所でもう一度押してください',
 };
 
-/** ホーム画面の下部の版の表示と「アプリを更新」（設計書 6.6 節）。 */
+/** ホーム画面の下部の版の表示と「アプリを更新」「記録の管理」（設計書 6.6 節）。 */
 function VersionFooter({
   version,
   onCheckUpdate,
+  onOpenRecords,
+  recordsReady,
 }: {
   version: string;
   onCheckUpdate: HomeProps['onCheckUpdate'];
+  onOpenRecords: HomeProps['onOpenRecords'];
+  recordsReady: boolean;
 }) {
   const [status, setStatus] = useState<UpdateCheckStatus>('idle');
   const abortRef = useRef<AbortController | null>(null);
@@ -113,6 +118,14 @@ function VersionFooter({
         >
           アプリを更新
         </button>
+        <button
+          type="button"
+          className="button-text update-button"
+          disabled={!recordsReady}
+          onClick={onOpenRecords}
+        >
+          記録の管理
+        </button>
       </div>
       <p
         className={status === 'failed' ? 'update-status update-status-error' : 'update-status'}
@@ -139,6 +152,7 @@ export function Home({
   onStartQuiz,
   onStartReview,
   onOpenStats,
+  onOpenRecords,
   browseName,
   onOpenBrowse,
   installBannerVisible,
@@ -268,7 +282,12 @@ export function Home({
         </section>
       </main>
 
-      <VersionFooter version={version} onCheckUpdate={onCheckUpdate} />
+      <VersionFooter
+        version={version}
+        onCheckUpdate={onCheckUpdate}
+        onOpenRecords={onOpenRecords}
+        recordsReady={ready}
+      />
     </div>
   );
 }

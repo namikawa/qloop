@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { expectNoHorizontalScroll, openSetup, radio, readDeckEvents } from './helpers';
+import { expectNoHorizontalScroll, openRecords, openSetup, radio, readDeckEvents } from './helpers';
 
 /** 判定と区切りの色（app.css のトークン）。 */
 const COLORS = {
@@ -225,9 +225,10 @@ test('確認ダイアログは、リセットの実行だけを赤にし、終�
 }) => {
   // リセット
   await page.goto('/');
-  await page.getByRole('button', { name: '成績', exact: true }).click();
+  await openRecords(page);
   await page.getByRole('button', { name: 'リセット' }).click();
   const reset = page.getByRole('dialog', { name: '成績をリセットしますか？' });
+  await expect(reset).toContainText('すべての教材の');
   const resetButton = reset.getByRole('button', { name: 'リセットする' });
   await expect(resetButton).toHaveClass(/\bbutton-destructive\b/);
   expect(await backgroundOf(resetButton)).toBe(COLORS.destructive);
@@ -251,6 +252,8 @@ test('確認ダイアログは、リセットの実行だけを赤にし、終�
     ),
   });
   const importing = page.getByRole('dialog', { name: '記録を読み込みますか？' });
+  await expect(importing).toContainText('すべての教材の');
+  await expect(importing.getByRole('button', { name: 'やめる' })).toBeFocused();
   const importButton = importing.getByRole('button', { name: '読み込む' });
   await expect(importButton).not.toHaveClass(/\bbutton-destructive\b/);
   expect(await backgroundOf(importButton)).toBe(COLORS.primary);

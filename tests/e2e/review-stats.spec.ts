@@ -4,6 +4,7 @@ import {
   collectCspViolations,
   expectNoHorizontalScroll,
   isYearInputEligible,
+  openRecords,
   openSetup,
   populationOf,
   radio,
@@ -169,14 +170,13 @@ test('成績画面は 全体・出来事別・履歴 を切り替えて出し、
   const [wrong, right] = await answerYearInputs(page, [false, true]);
   await openStats(page);
 
-  // 初めは「全体」。全体・時代別・記録の管理を出し、出来事別と履歴は出さない
+  // 初めは「全体」。全体・時代別を出し、記録の管理・出来事別・履歴は出さない
   const views = page.getByRole('group', { name: '成績の表示' });
   await expect(views.getByRole('radio')).toHaveCount(3);
   await expect(views.locator('label')).toHaveText(['全体', '出来事別', '履歴']);
   await expect(radio(page, '全体')).toBeChecked();
-  for (const name of ['時代別', '記録の管理']) {
-    await expect(page.getByRole('heading', { level: 2, name, exact: true })).toBeVisible();
-  }
+  await expect(page.getByRole('heading', { level: 2, name: '時代別', exact: true })).toBeVisible();
+  await expect(page.getByText('記録の管理', { exact: true })).toHaveCount(0);
   await expect(page.getByTestId('event-row')).toHaveCount(0);
   await expect(page.getByTestId('history-item')).toHaveCount(0);
   await expectNoHorizontalScroll(page);
@@ -296,9 +296,17 @@ test('JSON を読み込むと確認の後に記録が置き換わり、形式が
   };
 
   await page.goto('/');
-  await openStats(page);
+  await openRecords(page);
   const fileInput = page.getByTestId('import-file');
-  const notice = page.getByTestId('stats-notice');
+  const notice = page.getByTestId('records-notice');
+
+  const expectUnchanged = async () => {
+    await page.getByRole('button', { name: '戻る', exact: true }).click();
+    await openStats(page);
+    await expect(page.getByTestId('overall-attempts')).toHaveText('0 回');
+    await page.getByRole('button', { name: '戻る', exact: true }).click();
+    await openRecords(page);
+  };
 
   // JSON として読めないファイル
   await fileInput.setInputFiles(progressFile('{ broken', 'broken.json'));
@@ -308,22 +316,26 @@ test('JSON を読み込むと確認の後に記録が置き換わり、形式が
   await fileInput.setInputFiles(progressFile({ ...data, schemaVersion: 3 }));
   await expect(notice).toContainText('schemaVersion が 1 か 2 ではありません');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.getByTestId('overall-attempts')).toHaveText('0 回');
+  await expectUnchanged();
 
   // 確認ダイアログで取り消すと何も変えない
   await fileInput.setInputFiles(progressFile(data));
   const dialog = page.getByRole('dialog', { name: '記録を読み込みますか？' });
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText('回答 3 件・セッション 1 件');
+  await expect(dialog).toContainText(
+    'この端末の、すべての教材の学習の記録（回答・履歴・出題設定）が消え、ファイルの内容（回答 3 件・セッション 1 件）に置き換わります。',
+  );
   await expectNoHorizontalScroll(page);
   await dialog.getByRole('button', { name: 'やめる' }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByTestId('overall-attempts')).toHaveText('0 回');
+  await expectUnchanged();
 
   // 読み込むと全置換して集計し直す
   await fileInput.setInputFiles(progressFile(data));
   await dialog.getByRole('button', { name: '読み込む' }).click();
   await expect(notice).toHaveText('読み込みました（回答 3 件・セッション 1 件）');
+  await page.getByRole('button', { name: '戻る', exact: true }).click();
+  await openStats(page);
   await expect(page.getByTestId('overall-attempts')).toHaveText('3 回');
   await expect(page.getByTestId('overall-accuracy')).toHaveText('33%');
   await expect(page.getByTestId('overall-streak')).toHaveText('1 日');
@@ -341,22 +353,79 @@ test('JSON を読み込むと確認の後に記録が置き換わり、形式が
   await expect(page.getByTestId('review-count')).toHaveText('1 件');
 });
 
-test('リセットは確認の後に記録を消す（取り消せば消さない）', async ({ page }) => {
+test('ファイルの読み取り中は3つの行と「戻る」を押せず、確認を取り消すとまた押せる', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const originalText = Blob.prototype.text;
+    Blob.prototype.text = async function () {
+      await new Promise<void>((resolve) => {
+        Object.defineProperty(window, '__releaseRead', { value: resolve, configurable: true });
+      });
+      return originalText.call(this);
+    };
+  });
+  await page.goto('/');
+  await openRecords(page);
+  await page.getByTestId('import-file').setInputFiles(
+    progressFile({
+      schemaVersion: 2,
+      exportedAt: new Date().toISOString(),
+      attempts: [],
+      sessions: [],
+    }),
+  );
+
+  for (const name of ['書き出し', '読み込み', 'リセット', '戻る']) {
+    await expect(page.getByRole('button', { name, exact: true })).toBeDisabled();
+  }
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  await page.evaluate(() => {
+    (window as unknown as { __releaseRead: () => void }).__releaseRead();
+  });
+  const dialog = page.getByRole('dialog', { name: '記録を読み込みますか？' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'やめる' }).click();
+  await expect(dialog).toHaveCount(0);
+  for (const name of ['書き出し', '読み込み', 'リセット', '戻る']) {
+    await expect(page.getByRole('button', { name, exact: true })).toBeEnabled();
+  }
+});
+
+test('リセットは確認の後に記録を消し、ホームの連続学習日数と復習の札も更新する（取り消せば消さない）', async ({
+  page,
+}) => {
   await answerYearInputs(page, [false]);
+  await expect(page.getByTestId('home-streak')).toHaveText('連続学習日数 1 日');
+  await expect(page.getByTestId('home-review-count')).toHaveText('1 件');
   await openStats(page);
   await expect(page.getByTestId('overall-attempts')).toHaveText('1 回');
+  await page.getByRole('button', { name: '戻る', exact: true }).click();
+  await openRecords(page);
 
-  await page.getByRole('button', { name: 'リセット' }).click();
+  await page.getByRole('button', { name: 'リセット', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '成績をリセットしますか？' });
   await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText(
+    'この端末の、すべての教材の学習の記録（回答・履歴・出題設定）が消えます。元に戻せません。',
+  );
   await expectNoHorizontalScroll(page);
   await dialog.getByRole('button', { name: 'やめる' }).click();
   await expect(dialog).toHaveCount(0);
+  await page.getByRole('button', { name: '戻る', exact: true }).click();
+  await openStats(page);
   await expect(page.getByTestId('overall-attempts')).toHaveText('1 回');
+  await page.getByRole('button', { name: '戻る', exact: true }).click();
+  await openRecords(page);
 
-  await page.getByRole('button', { name: 'リセット' }).click();
+  await page.getByRole('button', { name: 'リセット', exact: true }).click();
   await dialog.getByRole('button', { name: 'リセットする' }).click();
-  await expect(page.getByTestId('stats-notice')).toHaveText('成績をリセットしました');
+  await expect(page.getByTestId('records-notice')).toHaveText('成績をリセットしました');
+  await page.getByRole('button', { name: '戻る', exact: true }).click();
+  await expect(page.getByTestId('home-streak')).toHaveText('連続学習日数 0 日');
+  await expect(page.getByTestId('home-review-count')).toHaveCount(0);
+  await openStats(page);
   await expect(page.getByTestId('overall-attempts')).toHaveText('0 回');
   await expect(page.getByTestId('overall-accuracy')).toHaveText('未回答');
   await expect(page.getByTestId('overall-streak')).toHaveText('0 日');
@@ -383,7 +452,7 @@ test('書き出しは、ファイル共有が使えなければダウンロー�
     });
   });
   await answerYearInputs(page, [false]);
-  await openStats(page);
+  await openRecords(page);
   await page.getByRole('button', { name: '書き出し' }).click();
   await expect(page.getByTestId('export-ready')).toBeVisible();
   await expect(page.getByRole('button', { name: '共有して保存' })).toHaveCount(0);
@@ -414,7 +483,7 @@ test('書き出しをもう一度押すと準備した欄を閉じ、また押�
     });
   });
   await answerYearInputs(page, [false]);
-  await openStats(page);
+  await openRecords(page);
   const exportButton = page.getByRole('button', { name: '書き出し' });
   await expect(exportButton).toHaveAttribute('aria-expanded', 'false');
   await exportButton.click();
@@ -452,10 +521,10 @@ test('書き出しは、共有に失敗したらダウンロードのリンク�
     });
   });
   await answerYearInputs(page, [false]);
-  await openStats(page);
+  await openRecords(page);
   await page.getByRole('button', { name: '書き出し' }).click();
   await page.getByRole('button', { name: '共有して保存' }).click();
-  await expect(page.getByTestId('stats-notice')).toContainText('共有できませんでした');
+  await expect(page.getByTestId('records-notice')).toContainText('共有できませんでした');
   await expect(page.getByRole('button', { name: '共有して保存' })).toHaveCount(0);
 
   // 切り替わったリンクの URL は生きていて、保存できる
@@ -471,7 +540,7 @@ test('書き出しは、共有に失敗したらダウンロードのリンク�
   // 「書き出し」で欄を閉じると、「ファイルを保存」への案内も消える
   await page.getByRole('button', { name: '書き出し' }).click();
   await expect(page.getByTestId('export-ready')).toHaveCount(0);
-  await expect(page.getByTestId('stats-notice')).toHaveCount(0);
+  await expect(page.getByTestId('records-notice')).toHaveCount(0);
 });
 
 test('書き出しは、ファイル共有が使えれば共有のシートで JSON を渡す', async ({ page }) => {
@@ -493,7 +562,7 @@ test('書き出しは、ファイル共有が使えれば共有のシートで J
     });
   });
   await page.goto('/');
-  await openStats(page);
+  await openRecords(page);
   await page.getByRole('button', { name: '書き出し' }).click();
   await page.getByRole('button', { name: '共有して保存' }).click();
   await expect

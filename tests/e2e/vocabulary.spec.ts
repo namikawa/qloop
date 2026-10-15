@@ -234,7 +234,7 @@ for (const pattern of ['意味 4 択', '言葉 4 択']) {
     await expect(page.getByTestId('era-row')).toContainText('慣用句');
     await expect(
       page.getByText('書き出し・読み込み・リセットは、すべての教材の記録をまとめて扱います。'),
-    ).toBeVisible();
+    ).toHaveCount(0);
     // WebKit の select の内部スタイルによる既存の CSP 違反が混ざるため、言葉別を開く前に確認する。
     expect(violations).toEqual([]);
     await radio(page, '言葉別').check();

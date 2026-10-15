@@ -15,6 +15,7 @@ import { EnglishQuizSetup } from './screens/EnglishQuizSetup';
 import { Home, type StoreStatus } from './screens/Home';
 import { Quiz, type QuizResult } from './screens/Quiz';
 import { QuizSetup } from './screens/QuizSetup';
+import { Records } from './screens/Records';
 import { Result } from './screens/Result';
 import { ReviewSetup } from './screens/ReviewSetup';
 import { VocabularyQuizSetup } from './screens/VocabularyQuizSetup';
@@ -35,6 +36,7 @@ type View =
   | { screen: 'setup' }
   | { screen: 'review-setup' }
   | { screen: 'stats' }
+  | { screen: 'records' }
   | { screen: 'quiz'; session: Session; questions: Question[] }
   | { screen: 'result'; result: QuizResult; scrollY?: number }
   | {
@@ -156,9 +158,13 @@ export function App() {
         deckName={deckName}
         population={current.population}
         rules={rules}
-        multipleDecks={SHOW_DECK_NAMES}
         onBack={goHome}
       />
+    );
+  }
+  if (store !== null && view.screen === 'records') {
+    return (
+      <Records store={store} deckNames={DECKS.map((model) => model.deck.name)} onBack={goHome} />
     );
   }
   if (store !== null && view.screen === 'quiz') {
@@ -251,6 +257,7 @@ export function App() {
         setView({ screen: 'browse', returnTo: { screen: 'home' }, highlightId: null })
       }
       onOpenStats={() => setView({ screen: 'stats' })}
+      onOpenRecords={() => setView({ screen: 'records' })}
       installBannerVisible={installBannerVisible}
       onCloseInstallBanner={() => setInstallBannerVisible(false)}
       updateAvailable={update.available}

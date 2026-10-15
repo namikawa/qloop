@@ -62,3 +62,12 @@ export async function openSetup(page: Page): Promise<void> {
   await page.getByRole('button', { name: '出題', exact: true }).click();
   await expect(page.getByRole('heading', { name: '出題設定' })).toBeVisible();
 }
+
+/** ホームの下部から全教材の記録の管理を開く。 */
+export async function openRecords(page: Page): Promise<void> {
+  await page
+    .locator('.footer-row')
+    .getByRole('button', { name: '記録の管理', exact: true })
+    .click();
+  await expect(page.getByRole('heading', { level: 1, name: '記録の管理' })).toBeVisible();
+}
