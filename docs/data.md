@@ -187,7 +187,7 @@
 
 ## 7. 英単語のデータ
 
-教材「英単語」（`data/decks/english-words/core.csv`）の手引き。列の定義と自動の検証は `docs/design.md` の 5.8 節、出題と誤答の選び方は 6.11 節にある。年表・語彙と違い、利用者が用意する本とレッスンの一覧をレッスンごとに段階的に足す。2026-10-15 に最初のデータとして STAGE2 Lesson 4 の 84 件（`en-0001`〜`en-0084`）を入れた。
+教材「英単語」（`data/decks/english-words/core.csv`）の手引き。列の定義と自動の検証は `docs/design.md` の 5.8 節、出題と誤答の選び方は 6.11 節にある。年表・語彙と違い、利用者が用意する本とレッスンの一覧をレッスンごとに段階的に足す。2026-10-15 に最初のデータとして STAGE2 Lesson 4 の 84 件（`en-0001`〜`en-0084`）を入れた。同日に STAGE2 Lesson 5 の 97 件（`en-0085`〜`en-0181`）を足した（1.3.1）。
 
 ### 7.1 1 つのファイル
 
@@ -209,7 +209,7 @@
 ### 7.3 列の使い分けと書き方
 
 - `word`: 一覧の表記のまま。大文字（`Pacific`）、ピリオド（`Never mind.`）、アポストロフィ（`here's`）、穴（`What ... for?`）も残す。同じ英単語かどうかは、大文字小文字・前後と連続する空白・全角と半角・アポストロフィの種類・末尾の記号を無視して比べる（`docs/design.md` の 6.11 節）。穴のある行はつづり入力の出題元にならず、別解にもならない。
-- `meaning`: 一覧の文面のまま。複数の意味の「、」区切り、「～」「…」、かっこの注記（`（線で）～を描く`）、文末の「。」もそのまま。上限は 50 字で、目安は 40 字。縮めない（意味の注記を落とさない）。
+- `meaning`: 一覧の文面のまま。複数の意味の「、」区切り、「～」「…」、かっこの注記（`（線で）～を描く`、`〈劇などの〉場面`）、文末の「。」もそのまま。数字は半角にする（一覧が全角でも直す。例: secondly の「第2に」）。上限は 50 字で、目安は 40 字。縮めない（意味の注記を落とさない）。
 - `pos`: 一覧の品詞のまま（`名詞`・`動詞`・`形容詞`・`副詞`・`代名詞`・`前置詞`・`接続詞`・`助動詞`・`間投詞`・`冠詞`・`数詞`。複数は「・」でつなぐ）。熟語・表現は空のままにする。一覧に無い品詞が出てきたら、コードの一覧と略記を足す。
 - `book`・`lesson`: 利用者の指定のとおり（本は `STAGE1`・`STAGE2`・`STAGE3`、レッスンは番号）。
 - `similar`: 意味が近く、4 択でどちらを選んでも正解と言える組に書く（例: somebody と anybody、anything と nothing）。同じ `meaning` の行（liberty と freedom の「自由」など）は書かなくても同じ答えとして扱われ、`similar` は同じ答えの集まり（同じ意味と `similar` でつながる全行。`docs/design.md` の 6.11 節）の全部に効くので、組のどれか 1 行に書けばよい。4 択では集まりの意味と英単語を誤答に出さない。つづり入力の正解には使わない（正解は、カードの文（品詞付きの意味）が同じ行の `word` だけ）。迷ったら書く（除外が多くても害は小さい）。品詞の違う組は、品詞の優先で互いの誤答に出にくいので、実データで並ぶかを確かめてから決める。
@@ -233,3 +233,8 @@
 | STAGE2 Lesson 4 の `similar` | somebody・someone と anybody、something と anything、anybody と nobody、anything と nothing に付ける。anybody と anything の意味には疑問文・否定文の用法（「誰か」「誰も…（ない）」「何か」「何も…（ない）」）が入っていて、4 択で並ぶとどちらを選んでも正解と言えるため。no one は nobody と同じ意味なので自動でつながる |
 | able と be able to（STAGE2 Lesson 4） | `similar` を付けない。意味は近いが品詞が違い（形容詞と熟語）、品詞の優先で互いの誤答に出ないため |
 | empty（STAGE2 Lesson 4） | 意味は一覧の表記「からの」のまま入れる |
+| STAGE2 Lesson 5 の `similar` | oval と ellipse、simple と clear、strange と mysterious、emotion と sense に付ける。意味に同じ語（「楕円形」「わかりやすい」）か、ほぼ同じ意味の語（「奇妙な」と「不思議な」、「感情」と「気持ち」）があり、4 択で並ぶとどちらを選んでも正解と言えるため |
+| hate と mind、unique と special、describe と draw、view と scene（hate・unique・describe・view・scene は STAGE2 Lesson 5、mind・special・draw は STAGE2 Lesson 4） | `similar` を付けない。意味の強さ（「ひどく嫌う」と「いやがる」）、意味の中心（「独特の」と「特別の」）、注記（「（線で）」「〈劇などの〉」）で見分けられるため |
+| proud と be proud of、aware と become aware of、variety と a variety of、stand・against と stand up against、succeed・success・successful、fear と scary（STAGE2 Lesson 5） | `similar` を付けない。品詞が違い、品詞の優先で互いの誤答に出ないため（able と be able to と同じ） |
+| DVD（STAGE2 Lesson 5） | 意味は一覧の「DVD」のまま入れる |
+| wish（STAGE2 Lesson 5） | 意味は一覧の「〈wish toで〉…したいと思う」のまま入れる（意味の文に英単語が入るが、一覧を正とする） |

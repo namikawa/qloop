@@ -126,19 +126,51 @@ for (const definition of DECK_DEFINITIONS) {
         }
         expect(wordsFor('en-0035')).not.toContain('anything');
       });
-      it('84件の全行で両パターンの選択肢を作れ、表示が重複せず、誤答の除外規則を守る', () => {
+      it.each([
+        ['en-0119', 'en-0149'],
+        ['en-0126', 'en-0127'],
+        ['en-0150', 'en-0159'],
+        ['en-0180', 'en-0181'],
+      ])('%s と %s は互いの意味と英単語の誤答から除く', (leftId, rightId) => {
         expect(result.ok ? [] : result.errors).toEqual([]);
         if (!result.ok || result.deck.kind !== 'english') return;
         const { items } = result.deck;
-        expect(items).toHaveLength(84);
+        const left = items.find((item) => item.id === leftId)!;
+        const right = items.find((item) => item.id === rightId)!;
+        for (const [item, other] of [
+          [left, right],
+          [right, left],
+        ]) {
+          const meanings = englishCandidates(item, 'englishMeaningChoice', items).flatMap((group) =>
+            group.map((candidate) => candidate.meaning),
+          );
+          const words = englishCandidates(item, 'englishWordChoice', items).flatMap((group) =>
+            group.map((candidate) => candidate.word),
+          );
+          expect(meanings, item.id).not.toContain(other.meaning);
+          expect(words, item.id).not.toContain(other.word);
+        }
+      });
+      it('全行の意味に全角の数字を含まない', () => {
+        expect(result.ok ? [] : result.errors).toEqual([]);
+        if (!result.ok || result.deck.kind !== 'english') return;
+        for (const item of result.deck.items) {
+          expect(item.meaning, item.id).not.toMatch(/[０-９]/);
+        }
+      });
+      it('全行で両パターンの選択肢を作れ、表示が重複せず、誤答の除外規則を守る', () => {
+        expect(result.ok ? [] : result.errors).toEqual([]);
+        if (!result.ok || result.deck.kind !== 'english') return;
+        const { items } = result.deck;
+        expect(items).toHaveLength(181);
         expect(items.map((item) => item.id)).toEqual(
-          Array.from({ length: 84 }, (_, i) => `en-${String(i + 1).padStart(4, '0')}`),
+          Array.from({ length: 181 }, (_, i) => `en-${String(i + 1).padStart(4, '0')}`),
         );
         expect(
           items.every(
-            (item) =>
+            (item, index) =>
               item.book === 'STAGE2' &&
-              item.lesson === 4 &&
+              item.lesson === (index < 84 ? 4 : 5) &&
               item.role === 'core' &&
               item.level === '中学',
           ),

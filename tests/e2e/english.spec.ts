@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import { meaningWithPos } from '../../src/core/english';
+import { englishLessons, lessonName, meaningWithPos } from '../../src/core/english';
 import type { EnglishWord } from '../../src/core/models';
 import { collectCspViolations, expectNoHorizontalScroll, radio } from './helpers';
 
@@ -14,7 +14,9 @@ function words(): EnglishWord[] {
 async function openEnglish(page: Page): Promise<void> {
   await page.goto('/');
   await radio(page, '英単語').check();
-  await expect(page.getByTestId('target-count')).toHaveText('出題できる英単語 84 件');
+  await expect(page.getByTestId('target-count')).toHaveText(
+    `出題できる英単語 ${words().length} 件`,
+  );
   await expect(page.getByTestId('target-count')).not.toContainText('基本');
 }
 
@@ -147,16 +149,20 @@ for (const pattern of ['意味 4 択', '英単語 4 択']) {
     await page.getByRole('button', { name: 'ホームへ' }).click();
     await page.getByRole('button', { name: '成績', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'レッスン別', exact: true })).toBeVisible();
-    await expect(page.getByTestId('era-row')).toContainText('STAGE2 Lesson 4');
+    const lessonRows = page.getByTestId('era-row');
+    await expect(lessonRows).toHaveCount(englishLessons(words()).length);
+    await expect(
+      lessonRows.filter({ has: page.getByText('STAGE2 Lesson 4', { exact: true }) }),
+    ).toHaveCount(1);
     expect(violations).toEqual([]);
     await radio(page, '英単語別').check();
     const statsRows = page.getByTestId('event-row');
-    await expect(statsRows).toHaveCount(84);
+    await expect(statsRows).toHaveCount(words().length);
     for (const row of await statsRows.all()) {
       const title = await row.locator('.event-row-title').textContent();
       const item = words().find((word) => word.word === title)!;
       await expect(row.locator('.event-row-sub')).toContainText(
-        `${meaningWithPos(item)} · STAGE2 Lesson 4`,
+        `${meaningWithPos(item)} · ${lessonName(item)}`,
       );
     }
     const answered = statsRows
