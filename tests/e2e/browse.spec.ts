@@ -28,7 +28,7 @@ async function expectBrowseRowVisible(page: Page, row: Locator): Promise<void> {
       (element) =>
         element
           .closest('.browse-section')
-          ?.querySelector('.browse-heading')
+          ?.querySelector('.browse-heading-bar')
           ?.getBoundingClientRect().bottom ?? null,
     );
     const bar = await page.locator('.bottom-bar').boundingBox();
@@ -45,6 +45,95 @@ async function expectBrowseRowVisible(page: Page, row: Locator): Promise<void> {
 for (const width of [375, 402]) {
   test.describe(`一覧（幅 ${width}px）`, () => {
     test.use({ viewport: { width, height: 667 } });
+
+    test('件数の行が上へ流れたら「上へ」を出し、一覧の状態を保って先頭へ戻る', async ({ page }) => {
+      await page.goto('/');
+      await page.getByRole('button', { name: '年表を覚える', exact: true }).click();
+      await expect(
+        page.getByRole('heading', { level: 1, name: '年表を覚える', exact: true }),
+      ).toBeVisible();
+      const topButtons = page.locator('.browse-top-button');
+      await expect(topButtons).toHaveCount(await page.locator('.browse-heading').count());
+      for (const button of await topButtons.all()) await expect(button).toBeHidden();
+      await expect(page.getByRole('button', { name: '上へ', exact: true })).toHaveCount(0);
+
+      await radio(page, 'すべて').check();
+      for (const era of ['昭和', '平成']) {
+        await page.getByRole('checkbox', { name: era, exact: true }).check();
+      }
+      await radio(page, '年').check();
+      const rows = page.getByTestId('browse-row');
+      await rows.first().click();
+      await expect(rows.first()).toHaveAttribute('aria-pressed', 'true');
+      await expect(rows.nth(1).locator('.browse-front')).toHaveText('？');
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+      for (const button of await topButtons.all()) await expect(button).toBeHidden();
+
+      const countText = await page.getByTestId('browse-count').textContent();
+      const bar = page.locator('.browse-heading-bar').first();
+      const heading = bar.locator('.browse-heading');
+      const before = await heading.boundingBox();
+      const bandBefore = await bar.boundingBox();
+      expect(before).not.toBeNull();
+      expect(bandBefore!.height).toBeGreaterThanOrEqual(44);
+      expect(bandBefore!.height).toBeLessThanOrEqual(46);
+      await expectNoHorizontalScroll(page);
+
+      // 件数が 1px でも残っている間は出さない。
+      await page.getByTestId('browse-count').evaluate((element) => {
+        window.scrollTo(0, element.getBoundingClientRect().bottom + window.scrollY - 1);
+      });
+      for (const button of await topButtons.all()) await expect(button).toBeHidden();
+      await bar.evaluate((element) => {
+        window.scrollTo(0, element.getBoundingClientRect().top + window.scrollY + 100);
+      });
+      for (const button of await topButtons.all()) await expect(button).toBeVisible();
+      const topButton = bar.getByRole('button', { name: '上へ', exact: true });
+      const band = await bar.boundingBox();
+      const button = await topButton.boundingBox();
+      const after = await heading.boundingBox();
+      expect(band).not.toBeNull();
+      expect(button).not.toBeNull();
+      expect(after).not.toBeNull();
+      expect(Math.abs(band!.y)).toBeLessThanOrEqual(1);
+      expect(band!.height).toBe(bandBefore!.height);
+      expect(button!.y).toBeGreaterThanOrEqual(0);
+      expect(button!.y + button!.height).toBeLessThanOrEqual(band!.y + band!.height);
+      expect(button!.height).toBeGreaterThanOrEqual(44);
+      expect(after!.x).toBe(before!.x);
+      expect(after!.width).toBe(before!.width);
+      await expectNoHorizontalScroll(page);
+
+      await topButton.click();
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+      for (const button of await topButtons.all()) await expect(button).toBeHidden();
+      await expect(page.getByRole('button', { name: '上へ', exact: true })).toHaveCount(0);
+      await expect(radio(page, 'すべて')).toBeChecked();
+      await expect(radio(page, '年')).toBeChecked();
+      for (const era of ['昭和', '平成']) {
+        await expect(page.getByRole('checkbox', { name: era, exact: true })).toBeChecked();
+      }
+      await expect(page.getByTestId('browse-count')).toHaveText(countText!);
+      await expect(rows.first()).toHaveAttribute('aria-pressed', 'true');
+      await expect(rows.first().locator('.browse-hidden')).toHaveCount(0);
+      await expect(rows.nth(1).locator('.browse-front')).toHaveText('？');
+      await expectNoHorizontalScroll(page);
+
+      // 件数が初めから画面の下にある高さでも、一気に送って戻れる。
+      await page.setViewportSize({ width, height: 400 });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const countBox = await page.getByTestId('browse-count').boundingBox();
+      expect(countBox!.y).toBeGreaterThanOrEqual(400);
+      for (const button of await topButtons.all()) await expect(button).toBeHidden();
+      await bar.evaluate((element) => {
+        window.scrollTo(0, element.getBoundingClientRect().top + window.scrollY + 100);
+      });
+      await expect(topButton).toBeVisible();
+      await topButton.click();
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+      for (const button of await topButtons.all()) await expect(button).toBeHidden();
+    });
 
     test('年表の絞り込み・件数・暗記カード・初期化と出題設定の維持', async ({ page }) => {
       const events = populationOf(readDeckEvents());
@@ -326,8 +415,19 @@ for (const kind of ['timeline', 'vocabulary'] as const) {
       if (kind === 'vocabulary' && (target as Word).reading !== null) {
         await expect(row.locator('.browse-reading')).toHaveText((target as Word).reading!);
       }
-      if (index === 0) await page.getByRole('button', { name: '戻る', exact: true }).click();
-      else await page.getByRole('button', { name: '結果に戻る', exact: true }).click();
+      if (index === 0) {
+        const topButton = page
+          .locator('.browse-section')
+          .filter({ has: row })
+          .getByRole('button', { name: '上へ', exact: true });
+        await expect(topButton).toBeVisible();
+        await topButton.click();
+        await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+        await expect(page.locator('.browse-top-button').first()).toBeHidden();
+        await expect(row).toHaveClass(/browse-highlight/);
+        await expect(page.getByRole('button', { name: '結果に戻る', exact: true })).toBeVisible();
+        await page.getByRole('button', { name: '戻る', exact: true }).click();
+      } else await page.getByRole('button', { name: '結果に戻る', exact: true }).click();
       await expect(page.getByTestId('result-score')).toHaveText('0 / 10');
       await expect
         .poll(async () => Math.abs((await page.evaluate(() => window.scrollY)) - scrollY))

@@ -1,5 +1,11 @@
 # 変更履歴
 
+## [1.3.2] - 2026-10-15
+
+### 追加
+
+- 一覧（年表を覚える・言葉を覚える・英単語を覚える）で、下へ送ると見出しの右端に「上へ」が出て、押すと画面の一番上へ戻る
+
 ## [1.3.1] - 2026-10-15
 
 ### 追加
@@ -72,6 +78,7 @@
 - ホーム画面の「アプリを更新」で、新しい版を探して切り替える
 - 年表のデータ: 出題できる出来事 371 件（うち基本の年表 129 件）
 
+[1.3.2]: https://github.com/namikawa/qloop/releases/tag/v1.3.2
 [1.3.1]: https://github.com/namikawa/qloop/releases/tag/v1.3.1
 [1.3.0]: https://github.com/namikawa/qloop/releases/tag/v1.3.0
 [1.2.0]: https://github.com/namikawa/qloop/releases/tag/v1.2.0

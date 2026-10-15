@@ -1991,16 +1991,44 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 
-.browse-heading {
+.browse-heading-bar {
   position: sticky;
   top: 0;
   z-index: 1;
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: calc(var(--font-size-label) * 1.4 + var(--space-3) * 2);
+  background: var(--color-bg);
+}
+
+.browse-heading {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
   gap: var(--space-2);
   margin: 0;
-  padding: var(--space-3) 0;
-  background: var(--color-bg);
+}
+
+.browse-heading-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.browse-heading-count {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.browse-top-button {
+  flex-shrink: 0;
+  min-height: var(--height-control);
+  /* 文字の右端をカードの右端にそろえる（「戻る」の行と同じ考え方） */
+  margin-right: calc(-1 * var(--space-2));
+  font-size: var(--font-size-label);
 }
 
 .browse-section + .browse-section {

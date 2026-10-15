@@ -25,6 +25,22 @@ export function BackIcon({ className }: IconProps) {
   );
 }
 
+/** 上へ戻る山形。 */
+export function ChevronUpIcon({ className }: IconProps) {
+  return (
+    <svg className={className} width="15" height="9" viewBox="0 0 19 11" {...hidden}>
+      <path
+        d="M2 9 9.5 2 17 9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /** 一覧の行の右端の山形。 */
 export function ChevronRightIcon({ className }: IconProps) {
   return (

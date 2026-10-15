@@ -11,6 +11,7 @@ import type { EventScope, Item, Pattern } from '../../core/models';
 import { reviewCandidates } from '../../core/review';
 import type { ProgressStore } from '../../storage/progress-store';
 import { BottomBar } from '../components/BottomBar';
+import { ChevronUpIcon } from '../components/icons';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { Segmented } from '../components/Segmented';
 import { GroupChips } from './VocabularyQuizSetup';
@@ -43,6 +44,8 @@ export function Browse<I extends Item, P extends Pattern>({
   const [selected, setSelected] = useState<string[]>([]);
   const [hidden, setHidden] = useState<BrowseHidden>('none');
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
+  const [showTopButton, setShowTopButton] = useState(false);
+  const countRef = useRef<HTMLParagraphElement>(null);
   const highlightRef = useRef<HTMLButtonElement>(null);
   const [reviewIds] = useState(() =>
     browseReviewIds(
@@ -65,6 +68,27 @@ export function Browse<I extends Item, P extends Pattern>({
     selected,
     rules.browseRangeText,
   );
+
+  useEffect(() => {
+    const countLine = countRef.current;
+    if (countLine === null) return;
+    let frame: number | null = null;
+    const checkPosition = () => {
+      if (frame !== null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        setShowTopButton(countLine.getBoundingClientRect().bottom < 0);
+      });
+    };
+    checkPosition();
+    window.addEventListener('scroll', checkPosition, { passive: true });
+    window.addEventListener('resize', checkPosition);
+    return () => {
+      window.removeEventListener('scroll', checkPosition);
+      window.removeEventListener('resize', checkPosition);
+      if (frame !== null) cancelAnimationFrame(frame);
+    };
+  }, [count, rangeText]);
 
   useEffect(() => {
     if (highlightId === null) return;
@@ -129,7 +153,7 @@ export function Browse<I extends Item, P extends Pattern>({
             }}
           />
         </div>
-        <p className="browse-count" data-testid="browse-count" role="status">
+        <p ref={countRef} className="browse-count" data-testid="browse-count" role="status">
           {count === 0 ? (
             'ありません'
           ) : (
@@ -140,9 +164,21 @@ export function Browse<I extends Item, P extends Pattern>({
         </p>
         {sections.map((section) => (
           <section className="browse-section" key={section.name} aria-label={section.name}>
-            <h2 className="section-label browse-heading">
-              {section.name} <span>{section.items.length} 件</span>
-            </h2>
+            <div className="browse-heading-bar">
+              <h2 className="section-label browse-heading">
+                <span className="browse-heading-name">{section.name}</span>{' '}
+                <span className="browse-heading-count">{section.items.length} 件</span>
+              </h2>
+              <button
+                type="button"
+                className="back-button browse-top-button"
+                style={{ visibility: showTopButton ? 'visible' : 'hidden' }}
+                onClick={() => window.scrollTo(0, 0)}
+              >
+                <ChevronUpIcon />
+                上へ
+              </button>
+            </div>
             <ul className="card card-flat list-card">
               {section.items.map((item) => {
                 const concealed = !revealed.has(item.id);
