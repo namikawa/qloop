@@ -1627,7 +1627,7 @@ describe('語彙の出題設定と記録', () => {
 });
 
 describe('英単語の出題設定と記録', () => {
-  it.each(['englishMeaningChoice', 'englishWordChoice', 'mixed'] as const)(
+  it.each(['englishMeaningChoice', 'englishWordChoice', 'englishSpelling', 'mixed'] as const)(
     '%s のscopeを持たない設定を保存し、再読み込みする',
     async (pattern) => {
       const { store, db } = await createStore();

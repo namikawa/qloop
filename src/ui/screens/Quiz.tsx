@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
-import type { Event, Question, Session } from '../../core/models';
-import { meaningWithPos } from '../../core/english';
+import type { EnglishWord, Event, Question, Session } from '../../core/models';
+import { isCorrectSpelling, meaningWithPos, normalizeEnglishWord } from '../../core/english';
 import { answeredRatio, progressSteps, type AnswerOutcome } from '../../core/progress';
 import { isCorrectYear } from '../../core/quiz';
 import {
@@ -315,6 +315,16 @@ function QuestionBody({ question, judgement, disabled, onAnswer, onGiveUp }: Que
           onGiveUp={onGiveUp}
         />
       );
+    case 'englishSpelling':
+      return (
+        <SpellingInputQuestion
+          word={question.item}
+          outcome={judgement === null ? null : outcomeOf(judgement)}
+          disabled={disabled}
+          onAnswer={(text) => onAnswer(isCorrectSpelling(text, question.answers), null)}
+          onGiveUp={onGiveUp}
+        />
+      );
     case 'choice':
       return (
         <ChoiceQuestion
@@ -333,6 +343,16 @@ function QuestionBody({ question, judgement, disabled, onAnswer, onGiveUp }: Que
  * 判定の帯の補足。年号入力と年号 4 択は正解の年（別解を併記）を出す。出来事 4 択は選択肢の強調で正解を示すので出さない。
  */
 function JudgementDetail({ question }: { question: Question }) {
+  if (question.pattern === 'englishSpelling') {
+    return (
+      <p className="judgement-detail spelling-detail">
+        正解のつづり{' '}
+        <span className="judgement-years" lang="en">
+          {question.answers.map((answer) => answer.word).join(' / ')}
+        </span>
+      </p>
+    );
+  }
   if (question.pattern === 'meaningChoice' || question.pattern === 'wordChoice') {
     return question.item.reading === null ? null : (
       <p className="judgement-detail">読み {question.item.reading}</p>
@@ -444,6 +464,71 @@ function YearInputQuestion({
           type="submit"
           className="button-primary year-answer-button"
           disabled={year === null || locked}
+        >
+          回答
+        </button>
+      </div>
+      {!answered && <GiveUpButton disabled={disabled} onClick={onGiveUp} />}
+    </form>
+  );
+}
+
+/** パターン H: つづり入力（設計書 6.11 節）。 */
+function SpellingInputQuestion({
+  word,
+  outcome,
+  disabled,
+  onAnswer,
+  onGiveUp,
+}: {
+  word: EnglishWord;
+  outcome: AnswerOutcome | null;
+  disabled: boolean;
+  onAnswer: (text: string) => void;
+  onGiveUp: () => void;
+}) {
+  const [text, setText] = useState('');
+  const answered = outcome !== null;
+  const locked = answered || disabled;
+  const empty = normalizeEnglishWord(text) === '';
+  return (
+    <form
+      className="question"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!empty && !locked) onAnswer(text);
+      }}
+    >
+      <div className="card question-card">
+        <p className="question-prompt">この意味の英単語は？</p>
+        <p className="question-text">{meaningWithPos(word)}</p>
+      </div>
+      <div className="year-answer">
+        <div className={outcome === null ? 'year-field' : YEAR_FIELD_CLASSES[outcome]}>
+          <input
+            type="text"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            autoComplete="off"
+            lang="en"
+            className="input-box-input spelling-field-input"
+            aria-label="つづり"
+            value={outcome === 'gaveUp' ? '' : text}
+            disabled={locked}
+            autoFocus
+            onChange={(event) => setText(event.target.value)}
+          />
+          {(outcome === 'correct' || outcome === 'wrong') && (
+            <span className="year-field-unit" aria-hidden="true">
+              <AnswerMarkIcon className={`year-field-mark ${outcome}`} kind={outcome} />
+            </span>
+          )}
+        </div>
+        <button
+          type="submit"
+          className="button-primary year-answer-button"
+          disabled={empty || locked}
         >
           回答
         </button>

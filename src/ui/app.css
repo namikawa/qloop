@@ -1200,8 +1200,9 @@ button:disabled {
   font-size: var(--font-size-year-input);
 }
 
-/* 判定の後も、入力した年は墨のまま見せる（押せない状態でも薄くしない） */
-.year-field-input:disabled {
+/* 判定の後も、入力した文字は墨のまま見せる（押せない状態でも薄くしない） */
+.year-field-input:disabled,
+.spelling-field-input:disabled {
   color: var(--color-text);
   opacity: 1;
   -webkit-text-fill-color: var(--color-text);
@@ -1451,6 +1452,10 @@ button:disabled {
   margin: var(--space-1) 0 0;
   font-size: var(--font-size-body);
   line-height: 1.4;
+}
+
+.spelling-detail {
+  overflow-wrap: anywhere;
 }
 
 .judgement-years {

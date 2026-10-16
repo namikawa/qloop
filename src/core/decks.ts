@@ -274,6 +274,7 @@ export interface EnglishDeckModel {
 const ENGLISH_PATTERN_LABELS: Readonly<Record<EnglishPatternMode, string>> = {
   englishMeaningChoice: '意味 4 択',
   englishWordChoice: '英単語 4 択',
+  englishSpelling: 'つづり入力',
   mixed: 'ミックス',
 };
 

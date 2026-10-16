@@ -8,6 +8,9 @@ import {
   buildQuestion as buildEnglishQuestion,
   choiceDisplay,
   distractorCandidates as englishCandidates,
+  isEligibleFor as isEnglishEligibleFor,
+  normalizeEnglishWord,
+  spellingAnswers,
 } from './english';
 import { mulberry32 } from './random';
 
@@ -103,6 +106,43 @@ for (const definition of DECK_DEFINITIONS) {
       });
     }
     if (definition.kind === 'english') {
+      it('穴のある2行だけをつづり入力から外し、全適格行の正解に自分のつづりを含む', () => {
+        expect(result.ok ? [] : result.errors).toEqual([]);
+        if (!result.ok || result.deck.kind !== 'english') return;
+        const { items } = result.deck;
+        const ineligible: string[] = [];
+        for (const item of items) {
+          const hasHole = /\.\.\.|…/.test(item.word);
+          expect(isEnglishEligibleFor(item, 'englishSpelling', items), item.id).toBe(!hasHole);
+          if (hasHole) ineligible.push(item.id);
+          const answers = spellingAnswers(item, items);
+          expect(
+            answers.every((answer) => !/\.\.\.|…/.test(answer.word)),
+            item.id,
+          ).toBe(true);
+          if (!hasHole)
+            expect(
+              answers.map((answer) => normalizeEnglishWord(answer.word)),
+              item.id,
+            ).toContain(normalizeEnglishWord(item.word));
+        }
+        expect(ineligible).toEqual(['en-0024', 'en-0109']);
+        expect(items.length - ineligible.length).toBe(179);
+        expect(
+          items.filter(
+            (item) => item.lesson === 4 && isEnglishEligibleFor(item, 'englishSpelling', items),
+          ),
+        ).toHaveLength(83);
+        for (const id of ['en-0037', 'en-0039']) {
+          const answers = spellingAnswers(
+            items.find((item) => item.id === id)!,
+            items,
+          );
+          expect(answers.map((answer) => answer.id)).toEqual(['en-0037', 'en-0039']);
+          expect(answers.map((answer) => answer.word)).toEqual(['someone', 'somebody']);
+          expect(answers.map((answer) => answer.id)).not.toContain('en-0040');
+        }
+      });
       it('否定文の意味も同じ答えとして扱い、意味と英単語の誤答から除く', () => {
         expect(result.ok ? [] : result.errors).toEqual([]);
         if (!result.ok || result.deck.kind !== 'english') return;
@@ -177,6 +217,7 @@ for (const definition of DECK_DEFINITIONS) {
         ).toBe(true);
         for (const item of items) {
           for (const pattern of ENGLISH_PATTERNS) {
+            if (pattern === 'englishSpelling') continue;
             const allowed = new Set(
               englishCandidates(item, pattern, items).flatMap((group) =>
                 group.map((candidate) => candidate.id),

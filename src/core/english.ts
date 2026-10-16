@@ -1,6 +1,7 @@
 import { parseCsv } from './csv';
 import {
   ENGLISH_PATTERNS,
+  type EnglishChoicePattern,
   type EnglishDeck,
   type EnglishPattern,
   type EnglishPatternMode,
@@ -155,7 +156,37 @@ export function sameAnswerGroup(
   return group;
 }
 
-export function choiceDisplay(word: EnglishWord, pattern: EnglishPattern): string {
+/** 穴のある表現は、つづり入力の出題元と別解から外す。 */
+export function isSpellingEligible(word: EnglishWord): boolean {
+  return !/\.\.\.|…/.test(word.word);
+}
+
+/** カードの文が同じ行だけを使い、id 順に正規化したつづりの重複を除く。 */
+export function spellingAnswers(
+  word: EnglishWord,
+  allWords: readonly EnglishWord[],
+): EnglishWord[] {
+  const card = meaningWithPos(word);
+  const seen = new Set<string>();
+  return allWords
+    .filter((item) => isSpellingEligible(item) && meaningWithPos(item) === card)
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .filter((item) => {
+      const normalized = normalizeEnglishWord(item.word);
+      if (seen.has(normalized)) return false;
+      seen.add(normalized);
+      return true;
+    });
+}
+
+export function isCorrectSpelling(input: string, answers: readonly EnglishWord[]): boolean {
+  const normalized = normalizeEnglishWord(input);
+  return (
+    normalized !== '' && answers.some((word) => normalizeEnglishWord(word.word) === normalized)
+  );
+}
+
+export function choiceDisplay(word: EnglishWord, pattern: EnglishChoicePattern): string {
   return pattern === 'englishMeaningChoice' ? word.meaning : normalizeEnglishWord(word.word);
 }
 
@@ -164,7 +195,7 @@ const candidateCache = new WeakMap<readonly EnglishWord[], Map<string, EnglishWo
 /** 表示が同じ候補は一組にし、品詞の優先には組の全行を使う。 */
 export function distractorCandidates(
   word: EnglishWord,
-  pattern: EnglishPattern,
+  pattern: EnglishChoicePattern,
   allWords: readonly EnglishWord[],
 ): EnglishWord[][] {
   let cache = candidateCache.get(allWords);
@@ -214,7 +245,10 @@ export function isEligibleFor(
   const key = `${pattern}:${word.id}`;
   let eligible = cache.get(key);
   if (eligible === undefined) {
-    eligible = distractorCandidates(word, pattern, allWords).length >= CHOICE_DISTRACTOR_COUNT;
+    eligible =
+      pattern === 'englishSpelling'
+        ? isSpellingEligible(word)
+        : distractorCandidates(word, pattern, allWords).length >= CHOICE_DISTRACTOR_COUNT;
     cache.set(key, eligible);
   }
   return eligible;
@@ -222,7 +256,7 @@ export function isEligibleFor(
 
 export function generateChoices(
   word: EnglishWord,
-  pattern: EnglishPattern,
+  pattern: EnglishChoicePattern,
   allWords: readonly EnglishWord[],
   rng: Rng,
 ): EnglishWord[] {
@@ -240,6 +274,13 @@ export function generateChoices(
   return shuffle([word, ...distractors], rng);
 }
 
+export function buildQuestion<P extends EnglishPattern>(
+  word: EnglishWord,
+  pattern: P,
+  allWords: readonly EnglishWord[],
+  currentYear: number,
+  rng: Rng,
+): Extract<EnglishQuestion, { pattern: P }>;
 export function buildQuestion(
   word: EnglishWord,
   pattern: EnglishPattern,
@@ -247,6 +288,9 @@ export function buildQuestion(
   _currentYear: number,
   rng: Rng,
 ): EnglishQuestion {
+  if (pattern === 'englishSpelling') {
+    return { item: word, pattern, answers: spellingAnswers(word, allWords) };
+  }
   return { item: word, pattern, choices: generateChoices(word, pattern, allWords, rng) };
 }
 
@@ -398,6 +442,7 @@ export function buildEnglishDeck(input: {
   }
   for (const word of items) {
     for (const pattern of ENGLISH_PATTERNS) {
+      if (pattern === 'englishSpelling') continue;
       const count = distractorCandidates(word, pattern, items).length;
       if (count < CHOICE_DISTRACTOR_COUNT)
         errors.push({

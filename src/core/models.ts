@@ -49,10 +49,12 @@ export const VOCABULARY_PATTERNS: readonly VocabularyPattern[] = Object.keys(
 ) as VocabularyPattern[];
 
 /** 英単語の出題パターン（設計書 6.11 節）。 */
-export type EnglishPattern = 'englishMeaningChoice' | 'englishWordChoice';
+export type EnglishChoicePattern = 'englishMeaningChoice' | 'englishWordChoice';
+export type EnglishPattern = EnglishChoicePattern | 'englishSpelling';
 const ENGLISH_PATTERN_KEYS: Record<EnglishPattern, true> = {
   englishMeaningChoice: true,
   englishWordChoice: true,
+  englishSpelling: true,
 };
 export const ENGLISH_PATTERNS: readonly EnglishPattern[] = Object.keys(
   ENGLISH_PATTERN_KEYS,
@@ -216,13 +218,15 @@ export type VocabularyQuestion = {
 }[VocabularyPattern];
 
 /** 英単語の 1 問（設計書 6.11 節）。 */
-export type EnglishQuestion = {
-  [P in EnglishPattern]: {
-    item: EnglishWord;
-    pattern: P;
-    choices: EnglishWord[];
-  };
-}[EnglishPattern];
+export type EnglishQuestion =
+  | {
+      [P in EnglishChoicePattern]: {
+        item: EnglishWord;
+        pattern: P;
+        choices: EnglishWord[];
+      };
+    }[EnglishChoicePattern]
+  | { item: EnglishWord; pattern: 'englishSpelling'; answers: EnglishWord[] };
 
 /**
  * 1 問（全種類の教材のもの）。どれも出題した項目 `item` とパターン `pattern` を持つ。

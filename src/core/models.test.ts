@@ -7,7 +7,7 @@ describe('PATTERNS', () => {
   });
 });
 
-it('全種類のパターンに語彙と英単語の両形式を含む', () => {
+it('全種類のパターンに語彙の両形式と英単語の3形式を含む', () => {
   expect(PATTERNS).toEqual([
     'yearInput',
     'yearChoice',
@@ -16,5 +16,6 @@ it('全種類のパターンに語彙と英単語の両形式を含む', () => {
     'wordChoice',
     'englishMeaningChoice',
     'englishWordChoice',
+    'englishSpelling',
   ]);
 });

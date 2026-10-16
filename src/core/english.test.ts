@@ -14,13 +14,17 @@ import {
   generateChoices,
   generateSession,
   isEligibleFor,
+  isCorrectSpelling,
+  isSpellingEligible,
   meaningWithPos,
   normalizeEnglishSettings,
   normalizeEnglishWord,
   sameAnswerGroup,
+  spellingAnswers,
 } from './english';
 import {
   ENGLISH_PATTERNS,
+  type EnglishChoicePattern,
   type EnglishWord,
   type EnglishSettings,
   type EventStats,
@@ -45,6 +49,10 @@ function word(id: string, extra: Partial<EnglishWord> = {}): EnglishWord {
   };
 }
 const WORDS = Array.from({ length: 8 }, (_, index) => word(`en-${index + 1}`));
+const CHOICE_PATTERNS: readonly EnglishChoicePattern[] = [
+  'englishMeaningChoice',
+  'englishWordChoice',
+];
 const HEADER = ENGLISH_CSV_COLUMNS.join(',');
 function csv(items: readonly EnglishWord[]): string {
   return [
@@ -77,7 +85,7 @@ function errors(core: string): string[] {
 }
 function candidateIds(
   target: EnglishWord,
-  pattern: (typeof ENGLISH_PATTERNS)[number],
+  pattern: EnglishChoicePattern,
   all: readonly EnglishWord[],
 ): string[] {
   return distractorCandidates(target, pattern, all).flatMap((group) =>
@@ -102,6 +110,125 @@ describe('英単語の正規化', () => {
     expect(normalizeEnglishWord('a.b?c!')).toBe('a.b?c');
     expect(normalizeEnglishWord('①')).toBe('①');
   });
+});
+
+describe('つづり入力', () => {
+  it.each([
+    ["here's", 'Here’s'],
+    ["here's", "here's"],
+    ["here's", ' ＨＥＲＥ＇Ｓ！？． '],
+    ['Never mind.', 'Never mind'],
+    ['Never mind.', 'never mind.'],
+    ['Never mind.', '  NEVER　 \t mind!?  '],
+    ['liberty', 'ｌｉｂｅｒｔｙ'],
+  ])('%s の正解に表記違いの %s を受け付ける', (answer, input) => {
+    expect(isCorrectSpelling(input, [word('en-0001', { word: answer })])).toBe(true);
+  });
+  it.each(['', '　 \t', '...', '?', '！？．'])('正規化して空になる %s は回答できない', (input) => {
+    expect(normalizeEnglishWord(input)).toBe('');
+    expect(isCorrectSpelling(input, [word('empty', { word: '...' })])).toBe(false);
+  });
+  it('カードの文が同じ行だけが別解になり、similarの相手と異なる品詞を含めない', () => {
+    const someone = word('en-0001', { word: 'someone', meaning: '誰か', pos: '代名詞' });
+    const somebody = word('en-0002', {
+      word: 'somebody',
+      meaning: '誰か',
+      pos: '代名詞',
+      similar: ['en-0003'],
+    });
+    const anybody = word('en-0003', {
+      word: 'anybody',
+      meaning: '誰か（疑問文）',
+      pos: '代名詞',
+      similar: ['en-0004'],
+    });
+    const nobody = word('en-0004', { word: 'nobody', meaning: '誰も…ない', pos: '代名詞' });
+    const otherPos = word('en-0005', { word: 'other', meaning: '誰か', pos: '名詞' });
+    const items = [somebody, nobody, someone, anybody, otherPos];
+    for (const source of [someone, somebody]) {
+      const question = buildQuestion(source, 'englishSpelling', items, 2026, mulberry32(0));
+      expect(question.answers).toEqual([someone, somebody]);
+      for (const input of ['someone', 'somebody'])
+        expect(isCorrectSpelling(input, question.answers)).toBe(true);
+      for (const input of ['anybody', 'nobody', 'other'])
+        expect(isCorrectSpelling(input, question.answers)).toBe(false);
+    }
+    expect(spellingAnswers(otherPos, items)).toEqual([otherPos]);
+  });
+  it('正規化したつづりの重複をまとめ、表記と並びに最小のidを使う', () => {
+    const first = word('en-0001', { word: 'Liberty!', meaning: '自由' });
+    const second = word('en-0002', { word: 'freedom', meaning: '自由' });
+    const again = word('en-0003', { word: 'ｌｉｂｅｒｔｙ', meaning: '自由', lesson: 5 });
+    const items = [again, second, first];
+    for (const source of items) expect(spellingAnswers(source, items)).toEqual([first, second]);
+    expect(items).toEqual([again, second, first]);
+  });
+  it.each(['What ... for?', 'Would you mind …ing?'])(
+    '穴のある %s は通常・ミックス・復習と別解から外すが、CSVの4択検証は通る',
+    (text) => {
+      const target = word('en-0000', { word: text, meaning: WORDS[0].meaning });
+      const items = [target, ...WORDS];
+      expect(isSpellingEligible(target)).toBe(false);
+      expect(isEligibleFor(target, 'englishSpelling', items)).toBe(false);
+      expect(eligibleQuestions([target], items, 'englishSpelling')).toEqual([]);
+      expect(
+        generateSession({
+          candidates: [target],
+          allWords: items,
+          mode: 'englishSpelling',
+          count: 'all',
+          rng: mulberry32(0),
+        }),
+      ).toEqual([]);
+      expect(eligibleQuestions([target], items, 'mixed')[0].patterns).toEqual(CHOICE_PATTERNS);
+      for (const [value, pattern] of [
+        [0, 'englishMeaningChoice'],
+        [0.499, 'englishMeaningChoice'],
+        [0.5, 'englishWordChoice'],
+        [0.999, 'englishWordChoice'],
+      ] as const) {
+        expect(
+          generateSession({
+            candidates: [target],
+            allWords: items,
+            mode: 'mixed',
+            count: 10,
+            rng: () => value,
+          })[0].pattern,
+        ).toBe(pattern);
+      }
+      const question = buildQuestion(WORDS[0], 'englishSpelling', items, 2026, mulberry32(0));
+      expect(question.answers).toEqual([WORDS[0]]);
+      expect(isCorrectSpelling(text, question.answers)).toBe(false);
+      const rules = deckModel({
+        id: 'english-words',
+        kind: 'english',
+        name: '英単語',
+        items,
+      }).rules;
+      expect(
+        reviewCandidates({
+          population: items,
+          allItems: items,
+          rules,
+          now: new Date('2026-10-17'),
+          stats: [
+            {
+              eventId: target.id,
+              pattern: 'englishSpelling',
+              attempts: 1,
+              correct: 0,
+              lastCorrect: false,
+              lastWrongAt: '2026-10-17T00:00:00.000Z',
+              lastAnsweredAt: '2026-10-17T00:00:00.000Z',
+              consecutiveCorrect: 0,
+            },
+          ],
+        }),
+      ).toEqual([]);
+      expect(build(csv(items)).ok).toBe(true);
+    },
+  );
 });
 
 describe('同じ答えの集まりと誤答の除外', () => {
@@ -169,7 +296,7 @@ describe('同じ答えの集まりと誤答の除外', () => {
       word('c'),
       word('d'),
     ];
-    for (const pattern of ENGLISH_PATTERNS) {
+    for (const pattern of CHOICE_PATTERNS) {
       const candidates = distractorCandidates(target, pattern, items);
       expect(candidates).toHaveLength(3);
       expect(candidates[0].map((item) => item.id)).toEqual(['a', 'b']);
@@ -191,7 +318,7 @@ describe('同じ答えの集まりと誤答の除外', () => {
     expect(isEligibleFor(target, 'englishMeaningChoice', expanded)).toBe(true);
     expect(isEligibleFor(target, 'englishMeaningChoice', items)).toBe(false);
     expect(eligibleQuestions([target, target], items, 'mixed')).toEqual([
-      { word: target, patterns: ['englishWordChoice'] },
+      { word: target, patterns: ['englishWordChoice', 'englishSpelling'] },
     ]);
     expect(eligibleQuestions([target], items, 'englishMeaningChoice')).toEqual([]);
     expect(() => generateChoices(target, 'englishMeaningChoice', items, mulberry32(1))).toThrow(
@@ -201,7 +328,7 @@ describe('同じ答えの集まりと誤答の除外', () => {
 });
 
 describe('品詞の優先と問題列', () => {
-  it.each(ENGLISH_PATTERNS)(
+  it.each(CHOICE_PATTERNS)(
     '%s は同じ品詞だけで3件あればそこから取り、足りなければ他の品詞で補う',
     (pattern) => {
       const target = word('target');
@@ -241,14 +368,14 @@ describe('品詞の優先と問題列', () => {
         word('d', { pos: '動詞' }),
         word('e', { pos: '形容詞' }),
       ];
-      for (const pattern of ENGLISH_PATTERNS) {
+      for (const pattern of CHOICE_PATTERNS) {
         expect(new Set(generateChoices(target, pattern, items, mulberry32(1)))).toEqual(
           new Set([target, ...preferred]),
         );
       }
     }
   });
-  it.each(ENGLISH_PATTERNS)('%s のまとめた表示はどれか一行の品詞が同じなら優先する', (pattern) => {
+  it.each(CHOICE_PATTERNS)('%s のまとめた表示はどれか一行の品詞が同じなら優先する', (pattern) => {
     const target = word('target');
     const first = word('first', { word: 'same', meaning: '同じ', pos: '動詞' });
     const match = word('match', { word: 'ＳＡＭＥ!', meaning: '同じ', lesson: 5 });
@@ -261,12 +388,14 @@ describe('品詞の優先と問題列', () => {
       expect(choices).not.toContain(first);
     }
   });
-  it('ミックスは0.5を境に等確率で選び、不適格な形式は出さない', () => {
+  it('ミックスは1/3と2/3を境に等確率で選び、不適格な形式は出さない', () => {
     for (const [value, pattern] of [
       [0, 'englishMeaningChoice'],
-      [0.499, 'englishMeaningChoice'],
-      [0.5, 'englishWordChoice'],
-      [0.999, 'englishWordChoice'],
+      [1 / 3 - 0.0001, 'englishMeaningChoice'],
+      [1 / 3, 'englishWordChoice'],
+      [2 / 3 - 0.0001, 'englishWordChoice'],
+      [2 / 3, 'englishSpelling'],
+      [0.999, 'englishSpelling'],
     ] as const) {
       const session = generateSession({
         candidates: [WORDS[0]],
@@ -293,6 +422,30 @@ describe('品詞の優先と問題列', () => {
         rng: () => 0,
       })[0].pattern,
     ).toBe('englishWordChoice');
+    for (const [value, pattern] of [
+      [0.499, 'englishWordChoice'],
+      [0.5, 'englishSpelling'],
+      [0.999, 'englishSpelling'],
+    ] as const) {
+      expect(
+        generateSession({
+          candidates: [target],
+          allWords: items,
+          mode: 'mixed',
+          count: 10,
+          rng: () => value,
+        })[0].pattern,
+      ).toBe(pattern);
+    }
+    expect(
+      generateSession({
+        candidates: [target],
+        allWords: [target],
+        mode: 'mixed',
+        count: 10,
+        rng: () => 0,
+      })[0].pattern,
+    ).toBe('englishSpelling');
   });
   it('問題列は重複せず、問題数を守り、選択肢は固定シードで再現できる', () => {
     const items = Array.from({ length: 25 }, (_, i) => word(`en-${i}`));
@@ -355,15 +508,16 @@ describe('レッスン・表示・設定', () => {
     expect(candidates.map((item) => item.id)).toEqual(['en-0003', 'en-0004', 'en-0001']);
     expect(filterByRange(items, { kind: 'all' })).toEqual(items);
     expect(filterByRange(items, { kind: 'categories', categories: [] })).toEqual([]);
-    expect(
-      generateSession({
-        candidates: [items[0]],
-        allWords: items,
-        mode: 'englishWordChoice',
-        count: 'all',
-        rng: mulberry32(1),
-      })[0].choices.some((item) => item.book !== 'STAGE3'),
-    ).toBe(true);
+    const question = generateSession({
+      candidates: [items[0]],
+      allWords: items,
+      mode: 'englishWordChoice',
+      count: 'all',
+      rng: mulberry32(1),
+    })[0];
+    expect(question.pattern).toBe('englishWordChoice');
+    if (question.pattern !== 'englishWordChoice') throw new Error('英単語4択の問題が必要です');
+    expect(question.choices.some((item) => item.book !== 'STAGE3')).toBe(true);
   });
   it('保存設定のレッスンを本の順・番号の順にし、無いものを除き、空なら全範囲にする', () => {
     const settings: EnglishSettings = {
@@ -443,7 +597,11 @@ describe('レッスン・表示・設定', () => {
     expect(rules.browse.front(items[0])).toBe(items[0].word);
     expect(rules.browse.back(items[0])).toBe(`(名) ${items[0].meaning}`);
     expect(rules.browse.reading(items[0])).toBeNull();
-    expect(rules.patterns.map(rules.patternLabel)).toEqual(['意味 4 択', '英単語 4 択']);
+    expect(rules.patterns.map(rules.patternLabel)).toEqual([
+      '意味 4 択',
+      '英単語 4 択',
+      'つづり入力',
+    ]);
     expect(rules.patternLabel('mixed')).toBe('ミックス');
     expect(rules.itemTitle(items[0])).toBe(items[0].word);
     expect(rules.itemDetail(items[0])).toBe(`(名) ${items[0].meaning} · STAGE3 Lesson 1`);
@@ -572,7 +730,7 @@ describe('英単語の CSV', () => {
 });
 
 describe('共通の復習と成績への接続', () => {
-  it('記録された両パターンを復習し、レッスン別・英単語別・履歴を集計する', () => {
+  it('記録された3パターンを復習し、レッスン別・英単語別・履歴を集計する', () => {
     const model = deckModel({ id: 'english-words', name: '英単語', kind: 'english', items: WORDS });
     const stats: EventStats[] = ENGLISH_PATTERNS.map((pattern) => ({
       eventId: WORDS[0].id,
@@ -601,9 +759,19 @@ describe('共通の復習と成績への接続', () => {
       rng: mulberry32(1),
       rules: model.rules,
     });
-    expect(questions).toHaveLength(2);
+    expect(questions).toHaveLength(3);
+    expect(questions.map((question) => question.pattern).sort()).toEqual(
+      [...ENGLISH_PATTERNS].sort(),
+    );
+    expect(questions.find((question) => question.pattern === 'englishSpelling')).toEqual({
+      item: WORDS[0],
+      pattern: 'englishSpelling',
+      answers: [WORDS[0]],
+    });
     expect(
-      questions.every((question) => 'choices' in question && question.choices.length === 4),
+      questions
+        .filter((question) => question.pattern !== 'englishSpelling')
+        .every((question) => 'choices' in question && question.choices.length === 4),
     ).toBe(true);
     const session: Session = {
       id: 's1',
@@ -626,8 +794,8 @@ describe('共通の復習と成績への接続', () => {
       studyDays: [],
       now,
     });
-    expect(summary.overall).toMatchObject({ attempts: 4, correct: 0 });
-    expect(summary.groups).toEqual([{ group: 'STAGE2 Lesson 4', attempts: 4, correct: 0 }]);
+    expect(summary.overall).toMatchObject({ attempts: 6, correct: 0 });
+    expect(summary.groups).toEqual([{ group: 'STAGE2 Lesson 4', attempts: 6, correct: 0 }]);
     expect(summary.items[0].patterns.map((record) => record.pattern)).toEqual(ENGLISH_PATTERNS);
     expect(summary.history.map((record) => record.id)).toEqual(['s1']);
     expect(describeSession(session, model.rules)).toBe('通常 · STAGE2 Lesson 4 · 意味 4 択');

@@ -422,7 +422,7 @@ describe('語彙の書き出しファイル', () => {
 });
 
 describe('英単語の書き出しファイル', () => {
-  it.each(['englishMeaningChoice', 'englishWordChoice'] as const)(
+  it.each(['englishMeaningChoice', 'englishWordChoice', 'englishSpelling'] as const)(
     '%s の記録・教材・レッスン範囲をJSONの往復で保つ',
     (pattern) => {
       const input = variant((data) => {

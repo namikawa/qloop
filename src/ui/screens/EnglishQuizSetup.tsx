@@ -32,7 +32,8 @@ const DEFAULT_SETTINGS: EnglishSettings = {
 const PATTERN_DESCRIPTIONS: Readonly<Record<EnglishPatternMode, string>> = {
   englishMeaningChoice: '4 つの意味から選ぶ',
   englishWordChoice: '4 つの英単語から選ぶ',
-  mixed: '2 つの形式をまぜる',
+  englishSpelling: '英単語をつづる',
+  mixed: '3 つの形式をまぜる',
 };
 /** 出題範囲の選択肢（設計書 6.11 節の 2）。 */
 const RANGE_OPTIONS: { value: EnglishRange['kind']; label: string }[] = [

@@ -310,6 +310,7 @@ export class ProgressStore {
       if (
         (settings.pattern === 'englishMeaningChoice' ||
           settings.pattern === 'englishWordChoice' ||
+          settings.pattern === 'englishSpelling' ||
           settings.pattern === 'mixed') &&
         (settings.range.kind === 'all' || settings.range.kind === 'categories')
       ) {
