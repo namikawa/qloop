@@ -41,6 +41,16 @@ export async function expectNoHorizontalScroll(page: Page): Promise<void> {
   expect(widths.scroll).toBeLessThanOrEqual(widths.client);
 }
 
+/** 初回の準備の帯の出入りで下の要素の位置が動くので、位置を測る前に呼ぶ。 */
+export async function waitForOfflineReady(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await expect(
+    page.locator('.banner').filter({ hasText: 'オフラインで使えるように準備しています' }),
+  ).toHaveCount(0);
+}
+
 export function radio(page: Page, name: string) {
   return page.getByRole('radio', { name, exact: true });
 }

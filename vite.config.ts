@@ -27,6 +27,13 @@ export default defineConfig({
   },
   build: {
     target: 'safari15',
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [{ name: 'decks', test: /[\\/]src[\\/]generated[\\/]decks\.json$/ }],
+        },
+      },
+    },
   },
   // 開発サーバーは React Refresh のインラインスクリプトが CSP で止まるため、preview にだけ付ける。
   preview: {
@@ -37,7 +44,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       injectRegister: 'auto',
-      strategies: 'generateSW',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       includeAssets: ['apple-touch-icon.png', 'qloop-logo.svg'],
       manifest: {
         name: 'QLoop',
@@ -53,8 +62,10 @@ export default defineConfig({
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
         ],
       },
-      workbox: {
-        navigateFallback: 'index.html',
+      injectManifest: {
+        target: 'safari15',
+        rollupFormat: 'iife',
+        globPatterns: ['**/*.{js,css,html,webp}'],
       },
     }),
   ],

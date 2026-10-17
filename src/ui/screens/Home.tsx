@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { KindLabels } from '../../core/decks';
 import type { UpdateCheckCallbacks, UpdateCheckResult } from '../../pwa/update-check';
+import type { PrecacheProgress } from '../../pwa/update-progress';
+import { UpdateProgress } from '../components/UpdateProgress';
 import { Banner, BannerCloseButton } from '../components/Banner';
 import {
   BrowseIcon,
@@ -46,6 +48,7 @@ interface HomeProps {
   installBannerVisible: boolean;
   onCloseInstallBanner: () => void;
   updateAvailable: boolean;
+  updateProgress: PrecacheProgress | null;
   onApplyUpdate: () => void;
   /** 「アプリを更新」を押したとき。通信して新しい版を探し、あれば切り替える。 */
   onCheckUpdate: (callbacks: UpdateCheckCallbacks) => Promise<UpdateCheckResult>;
@@ -68,13 +71,18 @@ function VersionFooter({
   onCheckUpdate,
   onOpenRecords,
   recordsReady,
+  progress,
+  status,
+  setStatus,
 }: {
   version: string;
   onCheckUpdate: HomeProps['onCheckUpdate'];
   onOpenRecords: HomeProps['onOpenRecords'];
   recordsReady: boolean;
+  progress: PrecacheProgress | null;
+  status: UpdateCheckStatus;
+  setStatus: (status: UpdateCheckStatus) => void;
 }) {
-  const [status, setStatus] = useState<UpdateCheckStatus>('idle');
   const abortRef = useRef<AbortController | null>(null);
 
   // ホーム画面を離れたら確認を中断し、学習の途中で切り替わらないようにする
@@ -131,7 +139,18 @@ function VersionFooter({
         className={status === 'failed' ? 'update-status update-status-error' : 'update-status'}
         role="status"
       >
-        {UPDATE_CHECK_MESSAGES[status]}
+        {busy ? (
+          <UpdateProgress
+            message={
+              status === 'installing' || (progress !== null && progress.done < progress.total)
+                ? UPDATE_CHECK_MESSAGES.installing
+                : UPDATE_CHECK_MESSAGES.checking
+            }
+            progress={progress}
+          />
+        ) : (
+          UPDATE_CHECK_MESSAGES[status]
+        )}
       </p>
     </footer>
   );
@@ -158,9 +177,14 @@ export function Home({
   installBannerVisible,
   onCloseInstallBanner,
   updateAvailable,
+  updateProgress,
   onApplyUpdate,
   onCheckUpdate,
 }: HomeProps) {
+  const [updateStatus, setUpdateStatus] = useState<UpdateCheckStatus>('idle');
+  const checkingUpdate = updateStatus === 'checking' || updateStatus === 'installing';
+  const loadingUpdate = updateProgress !== null && updateProgress.done < updateProgress.total;
+  const controlled = 'serviceWorker' in navigator && navigator.serviceWorker.controller !== null;
   const ready = storeStatus.status === 'ready';
   const reviewLabelId = useId();
   const reviewBadgeId = useId();
@@ -173,7 +197,17 @@ export function Home({
           Safari の共有メニューから『ホーム画面に追加』して使ってください
         </Banner>
       )}
-      {updateAvailable && (
+      {!checkingUpdate && loadingUpdate && (
+        <Banner icon={<UpdateIcon />}>
+          <UpdateProgress
+            message={
+              controlled ? '新しい版を読み込んでいます' : 'オフラインで使えるように準備しています'
+            }
+            progress={updateProgress}
+          />
+        </Banner>
+      )}
+      {!checkingUpdate && !loadingUpdate && updateAvailable && (
         <Banner
           icon={<UpdateIcon />}
           action={
@@ -287,6 +321,9 @@ export function Home({
         onCheckUpdate={onCheckUpdate}
         onOpenRecords={onOpenRecords}
         recordsReady={ready}
+        progress={updateProgress}
+        status={updateStatus}
+        setStatus={setUpdateStatus}
       />
     </div>
   );

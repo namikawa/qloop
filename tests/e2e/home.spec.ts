@@ -1,6 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { devices, expect, test } from '@playwright/test';
-import { collectCspViolations, expectNoHorizontalScroll, openRecords, radio } from './helpers';
+import {
+  collectCspViolations,
+  expectNoHorizontalScroll,
+  openRecords,
+  radio,
+  waitForOfflineReady,
+} from './helpers';
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8')) as T;
@@ -19,6 +25,7 @@ for (const width of [375, 402]) {
         Object.defineProperty(Navigator.prototype, 'standalone', { get: () => true });
       });
       await page.goto('/');
+      await waitForOfflineReady(page);
       await expect(page.locator('.banner')).toHaveCount(0);
       const deck = page.locator('section.deck');
       const streak = page.getByTestId('home-streak');
@@ -62,6 +69,7 @@ for (const width of [375, 402]) {
       page,
     }) => {
       await page.goto('/');
+      await waitForOfflineReady(page);
       const footer = page.locator('.footer-row');
       const update = footer.getByRole('button', { name: 'アプリを更新', exact: true });
       const records = footer.getByRole('button', { name: '記録の管理', exact: true });

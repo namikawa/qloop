@@ -261,6 +261,7 @@ export function App() {
       installBannerVisible={installBannerVisible}
       onCloseInstallBanner={() => setInstallBannerVisible(false)}
       updateAvailable={update.available}
+      updateProgress={update.progress}
       onApplyUpdate={update.apply}
       onCheckUpdate={update.check}
     />

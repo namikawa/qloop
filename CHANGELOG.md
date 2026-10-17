@@ -1,5 +1,11 @@
 # 変更履歴
 
+## [1.4.1] - 2026-10-17
+
+### 追加
+
+- アプリの更新で新しい版を読み込んでいる間と、初めて開いてオフラインで使えるように準備している間、ホームに進み具合の横棒と百分率を表示する
+
 ## [1.4.0] - 2026-10-17
 
 ### 追加
@@ -92,6 +98,7 @@
 - ホーム画面の「アプリを更新」で、新しい版を探して切り替える
 - 年表のデータ: 出題できる出来事 371 件（うち基本の年表 129 件）
 
+[1.4.1]: https://github.com/namikawa/qloop/releases/tag/v1.4.1
 [1.4.0]: https://github.com/namikawa/qloop/releases/tag/v1.4.0
 [1.3.2]: https://github.com/namikawa/qloop/releases/tag/v1.3.2
 [1.3.1]: https://github.com/namikawa/qloop/releases/tag/v1.3.1

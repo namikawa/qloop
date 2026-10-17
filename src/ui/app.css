@@ -926,6 +926,57 @@ button:disabled {
   color: var(--color-wrong);
 }
 
+.update-progress {
+  display: block;
+  min-width: 0;
+  font-size: var(--font-size-body);
+  color: var(--color-text);
+}
+
+.update-progress-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.update-progress-track {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 1 1 auto;
+  width: 0;
+  min-width: 0;
+  height: 6px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 3px;
+  background: var(--color-step-upcoming);
+}
+
+.update-progress-track::-webkit-progress-bar {
+  background: var(--color-step-upcoming);
+  border-radius: 3px;
+}
+
+.update-progress-track::-webkit-progress-value {
+  background: var(--color-primary);
+  border-radius: 3px;
+}
+
+.update-progress-track::-moz-progress-bar {
+  background: var(--color-primary);
+  border-radius: 3px;
+}
+
+.update-progress-percent {
+  flex: none;
+  min-width: 4ch;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sub);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 /* ---- 出題設定・復習 ---- */
 
 .setup {

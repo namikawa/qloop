@@ -7,7 +7,12 @@ import {
   spellingAnswers,
 } from '../../src/core/english';
 import type { EnglishWord } from '../../src/core/models';
-import { collectCspViolations, expectNoHorizontalScroll, radio } from './helpers';
+import {
+  collectCspViolations,
+  expectNoHorizontalScroll,
+  radio,
+  waitForOfflineReady,
+} from './helpers';
 
 function words(): EnglishWord[] {
   const decks = JSON.parse(
@@ -428,6 +433,7 @@ for (const width of [375, 402]) {
   test(`英単語の一覧と暗記カードは幅${width}pxで横に出ない`, async ({ page }) => {
     await page.setViewportSize({ width, height: 667 });
     await openEnglish(page);
+    await waitForOfflineReady(page);
     await expectNoHorizontalScroll(page);
     const box = await page.locator('section.deck').boundingBox();
     expect(box!.y + box!.height).toBeLessThanOrEqual(667);

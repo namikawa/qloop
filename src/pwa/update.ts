@@ -1,7 +1,10 @@
+import { useSyncExternalStore } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { createUpdateProgressStore, type PrecacheProgress } from './update-progress';
 import { checkForUpdate, type UpdateCheckCallbacks, type UpdateCheckResult } from './update-check';
 
 export interface AppUpdate {
+  progress: PrecacheProgress | null;
   /** 新しい Service Worker が待機しているか。 */
   available: boolean;
   /** 新しい Service Worker を有効にして再読み込みする。 */
@@ -15,6 +18,7 @@ export interface AppUpdate {
 let applyRequested = false;
 /** 別の画面が更新を適用し、新しい Service Worker がこの画面も制御し始めたか。 */
 let takenOverByNewWorker = false;
+const progressStore = createUpdateProgressStore();
 
 /** Service Worker の登録（vite-plugin-pwa の onRegisteredSW・onRegisterError で決まる）。 */
 let settleRegistration: (registration: ServiceWorkerRegistration | null) => void = () => {};
@@ -26,6 +30,7 @@ function handleRegisteredSW(
   _swScriptUrl: string,
   registration: ServiceWorkerRegistration | undefined,
 ): void {
+  if (registration !== undefined) progressStore.watchRegistration(registration);
   settleRegistration(registration ?? null);
 }
 
@@ -61,6 +66,9 @@ function handleNeedReload(): void {
 // 帯を出す前に切り替わる場合（「アプリを更新」から切り替えたとき、別の画面が更新を適用したとき）も拾えるよう、
 // 制御の切り替わりは起動したときから自分でも見る
 if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    progressStore.receive(event.data, event.source);
+  });
   navigator.serviceWorker.addEventListener('controllerchange', handleNeedReload);
 }
 
@@ -70,6 +78,7 @@ if ('serviceWorker' in navigator) {
  * アプリ全体で 1 回だけ使う（App から呼ぶ）。
  */
 export function useAppUpdate(): AppUpdate {
+  const progress = useSyncExternalStore(progressStore.subscribe, progressStore.getSnapshot);
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
@@ -90,6 +99,7 @@ export function useAppUpdate(): AppUpdate {
   };
 
   return {
+    progress,
     available: needRefresh,
     apply,
     check: (callbacks) =>
