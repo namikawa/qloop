@@ -3,7 +3,7 @@
  * src/generated/decks.json（教材の配列）を書く。
  * 検証に失敗したら全教材の全エラーを教材名・ファイル名・行番号付きで出し、終了コード 1 で終わる（ビルドを止める）。
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDeckFromCsv, DECK_DEFINITIONS, deckModel } from '../src/core/decks';
@@ -23,6 +23,13 @@ for (const definition of DECK_DEFINITIONS) {
       : {}),
   });
   if (result.ok) {
+    if (result.deck.kind === 'geography') {
+      for (const item of result.deck.items) {
+        const file = `public/geography/${item.id}.webp`;
+        if (!existsSync(new URL(`../${file}`, import.meta.url)))
+          errors.push(`${definition.name} ${file}: 地図の画像がありません`);
+      }
+    }
     decks.push(result.deck);
   } else {
     errors.push(...result.errors.map((error) => `${definition.name} ${error}`));

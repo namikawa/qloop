@@ -2,6 +2,7 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type {
   Attempt,
   EnglishSettings,
+  GeographySettings,
   EventStats,
   Pattern,
   Session,
@@ -25,7 +26,8 @@ export const LEGACY_DECK_ID = 'japanese-history';
 export type StoredSettings = Omit<Settings, 'scope'> & Partial<Pick<Settings, 'scope'>>;
 
 /** 全種類の教材で保存する出題設定。 */
-export type StoredDeckSettings = StoredSettings | VocabularySettings | EnglishSettings;
+export type StoredDeckSettings =
+  StoredSettings | VocabularySettings | EnglishSettings | GeographySettings;
 
 /** 教材ごとの出題設定の `meta` の鍵（`settings:<教材の id>`）。 */
 export type SettingsKey = `settings:${string}`;

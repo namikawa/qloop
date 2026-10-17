@@ -72,6 +72,7 @@
   --font-size-label: 15px; /* 項目名 */
   --font-size-sub: 14px; /* 補助の文字・版の表示 */
   --font-size-caption: 13px; /* 注記（最小） */
+  --font-size-credit: 12px; /* 日本地理の出典の表記だけに使う（出題の画面の 1 行と一覧の注記）。注記の最小13pxより1段小さい */
   --font-size-badge: 12px; /* 札（正解・選んだ答え・中断） */
   --line-height-body: 1.5;
   --line-height-question: 1.55;
@@ -544,6 +545,11 @@ button:disabled {
   appearance: none;
 }
 
+.input-box-input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
 .input-box-unit {
   flex: none;
   margin-left: var(--space-2);
@@ -706,6 +712,7 @@ button:disabled {
   background: var(--color-surface);
   font-size: var(--font-size-body);
   line-height: 1.25;
+  text-align: center;
 }
 
 .chip-check {
@@ -1160,6 +1167,7 @@ button:disabled {
 
 .quiz {
   display: flex;
+  flex: 1 0 auto;
   flex-direction: column;
 }
 
@@ -2218,4 +2226,103 @@ button:disabled {
   display: inline-block;
   margin-left: var(--space-2);
   white-space: nowrap;
+}
+
+/* 日本地理 */
+.geography-question {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+
+.geography-credit {
+  margin: auto 0 0;
+  padding-top: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-credit);
+  line-height: 1.4;
+  text-align: center;
+}
+
+.geography-card {
+  margin-top: 6px;
+  padding: var(--space-3);
+}
+
+.geography-map {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+}
+
+.geography-card .geography-map,
+.geography-map-error {
+  margin-top: var(--space-2);
+}
+
+.geography-map-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1000 / 648;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+}
+
+.geography-note,
+.browse-credit {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  line-height: 1.4;
+}
+
+/* 出典の注記は出題の画面の出典の 1 行と同じ 12px。リンクの押せる範囲は広げない（visual-design.md の 3 章） */
+.browse-credit {
+  font-size: var(--font-size-credit);
+}
+
+.browse-credit-links {
+  display: block;
+  margin-top: var(--space-1);
+}
+
+.browse-credit a {
+  display: inline-block;
+  margin-right: var(--space-2);
+}
+
+.browse-credit a,
+.browse-credit a:visited {
+  color: var(--color-primary);
+}
+
+.geography-choice {
+  justify-content: center;
+  min-height: var(--height-year-option);
+  padding: 0 var(--space-2);
+  font-size: var(--font-size-body);
+  text-align: center;
+}
+
+.geography-choices .choice-title {
+  width: 100%;
+}
+
+.judgement-detail p {
+  margin: 0;
+}
+
+.browse-row-image .browse-back {
+  width: 100%;
+}
+
+.geography-choice.correct,
+.geography-choice.wrong,
+.geography-choice.correct:disabled:active,
+.geography-choice.wrong:disabled:active {
+  padding: 0 7px;
 }

@@ -1,5 +1,12 @@
+import {
+  geographyImageUrl,
+  GEOGRAPHY_IMAGE_WIDTH,
+  GEOGRAPHY_IMAGE_HEIGHT,
+  normalizeGeographyInput,
+  isCorrectName,
+} from '../../core/geography';
 import { useRef, useState } from 'react';
-import type { EnglishWord, Event, Question, Session } from '../../core/models';
+import type { EnglishWord, Event, GeoPlace, Question, Session } from '../../core/models';
 import { isCorrectSpelling, meaningWithPos, normalizeEnglishWord } from '../../core/english';
 import { answeredRatio, progressSteps, type AnswerOutcome } from '../../core/progress';
 import { isCorrectYear } from '../../core/quiz';
@@ -244,6 +251,17 @@ interface QuestionBodyProps {
 /** 問題の部品。問題のパターンで振り分ける（年表は年号入力・年号 4 択・出来事 4 択）。 */
 function QuestionBody({ question, judgement, disabled, onAnswer, onGiveUp }: QuestionBodyProps) {
   switch (question.pattern) {
+    case 'geoNameChoice':
+    case 'geoNameInput':
+      return (
+        <GeographyQuestionBody
+          question={question}
+          judgement={judgement}
+          disabled={disabled}
+          onAnswer={onAnswer}
+          onGiveUp={onGiveUp}
+        />
+      );
     case 'yearInput':
       return (
         <YearInputQuestion
@@ -343,6 +361,14 @@ function QuestionBody({ question, judgement, disabled, onAnswer, onGiveUp }: Que
  * 判定の帯の補足。年号入力と年号 4 択は正解の年（別解を併記）を出す。出来事 4 択は選択肢の強調で正解を示すので出さない。
  */
 function JudgementDetail({ question }: { question: Question }) {
+  if (question.pattern === 'geoNameChoice' || question.pattern === 'geoNameInput') {
+    return (
+      <div className="judgement-detail">
+        {question.pattern === 'geoNameInput' && <p>正解 {question.item.name}</p>}
+        <p>読み {question.item.reading}</p>
+      </div>
+    );
+  }
   if (question.pattern === 'englishSpelling') {
     return (
       <p className="judgement-detail spelling-detail">
@@ -722,5 +748,115 @@ function WordChoiceQuestion({
       </ul>
       {judgement === null && <GiveUpButton disabled={disabled} onClick={onGiveUp} />}
     </div>
+  );
+}
+
+function GeographyMapCard({ place }: { place: GeoPlace }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className="card geography-card">
+      <p className="question-prompt">{place.question}</p>
+      {failed ? (
+        <div className="geography-map-error" role="status">
+          地図を読み込めませんでした
+        </div>
+      ) : (
+        <img
+          className="geography-map"
+          src={geographyImageUrl(place.id)}
+          width={GEOGRAPHY_IMAGE_WIDTH}
+          height={GEOGRAPHY_IMAGE_HEIGHT}
+          alt="地図"
+          decoding="async"
+          onError={() => setFailed(true)}
+        />
+      )}
+      {place.note && <p className="geography-note">{place.note}</p>}
+    </div>
+  );
+}
+function GeographyQuestionBody({
+  question,
+  judgement,
+  disabled,
+  onAnswer,
+  onGiveUp,
+}: QuestionBodyProps & {
+  question: Extract<Question, { pattern: 'geoNameChoice' | 'geoNameInput' }>;
+}) {
+  const [text, setText] = useState('');
+  const outcome = judgement === null ? null : outcomeOf(judgement);
+  const locked = judgement !== null || disabled;
+  const empty = normalizeGeographyInput(text) === '';
+  return (
+    <form
+      className="question geography-question"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (question.pattern === 'geoNameInput' && !empty && !locked)
+          onAnswer(isCorrectName(text, question.item), null);
+      }}
+    >
+      <GeographyMapCard place={question.item} />
+      {question.pattern === 'geoNameChoice' ? (
+        <ul className="year-choices geography-choices">
+          {question.choices.map((choice) => {
+            const { className, badge } = settledChoice(
+              judgement,
+              choice.id === question.item.id,
+              choice.id === judgement?.chosen,
+              'choice geography-choice',
+            );
+            return (
+              <li key={choice.id}>
+                <button
+                  type="button"
+                  className={className}
+                  data-testid="geography-choice"
+                  disabled={locked}
+                  onClick={() => onAnswer(choice.id === question.item.id, choice.id)}
+                >
+                  <span className="choice-title">{choice.name}</span>
+                  {badge !== null && <span className="choice-badge">{badge}</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <div className="year-answer">
+          <div className={outcome === null ? 'year-field' : YEAR_FIELD_CLASSES[outcome]}>
+            <input
+              type="text"
+              lang="ja"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="ひらがなでもよい"
+              aria-label="名前"
+              className="input-box-input spelling-field-input"
+              value={outcome === 'gaveUp' ? '' : text}
+              disabled={locked}
+              autoFocus
+              onChange={(event) => setText(event.target.value)}
+            />
+            {(outcome === 'correct' || outcome === 'wrong') && (
+              <span className="year-field-unit" aria-hidden="true">
+                <AnswerMarkIcon className={`year-field-mark ${outcome}`} kind={outcome} />
+              </span>
+            )}
+          </div>
+          <button
+            type="submit"
+            className="button-primary year-answer-button"
+            disabled={empty || locked}
+          >
+            回答
+          </button>
+        </div>
+      )}
+      {judgement === null && <GiveUpButton disabled={disabled} onClick={onGiveUp} />}
+      <p className="geography-credit">地図: Natural Earth と国土地理院の資料をもとに作成</p>
+    </form>
   );
 }

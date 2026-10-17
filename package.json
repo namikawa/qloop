@@ -1,6 +1,6 @@
 {
   "name": "qloop",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "private": true,
   "description": "1 問 1 答で勉強する PWA",
   "license": "MIT",
@@ -20,7 +20,8 @@
     "lint": "tsc --noEmit && eslint .",
     "format": "prettier --write .",
     "data": "tsx scripts/build-data.ts",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "geography:images": "tsx scripts/geography-images.ts"
   },
   "dependencies": {
     "idb": "^8.0.4",
@@ -39,6 +40,7 @@
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.13.0",
     "prettier": "^3.9.10",
+    "sharp": "^0.35.5",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.71.1",

@@ -132,6 +132,7 @@ export function Browse<I extends Item, P extends Pattern>({
               groups={groups}
               groupHeading={rules.groupHeading}
               groupChipLabel={rules.groupChipLabel}
+              columns={rules.chipColumns}
               selected={selected}
               onToggle={(group) =>
                 setSelected((previous) =>
@@ -184,13 +185,14 @@ export function Browse<I extends Item, P extends Pattern>({
                 const concealed = !revealed.has(item.id);
                 const hideFront = hidden === 'front' && concealed;
                 const hideBack = hidden === 'back' && concealed;
+                const image = browse.image?.(item);
                 const reading = hideFront ? null : browse.reading(item);
                 return (
                   <li key={item.id}>
                     <button
                       type="button"
                       ref={item.id === highlightId ? highlightRef : undefined}
-                      className={`browse-row browse-row-${browse.layout}${item.id === highlightId ? ' browse-highlight' : ''}${hidden !== 'none' ? ' browse-interactive' : ''}`}
+                      className={`browse-row browse-row-${browse.layout}${item.id === highlightId ? ' browse-highlight' : ''}${hidden !== 'none' ? ' browse-interactive' : ''}${image ? ' browse-row-image' : ''}`}
                       data-testid="browse-row"
                       data-item-id={item.id}
                       aria-pressed={hidden === 'none' ? undefined : revealed.has(item.id)}
@@ -201,7 +203,21 @@ export function Browse<I extends Item, P extends Pattern>({
                         {reading !== null && <span className="browse-reading">{reading}</span>}
                       </span>
                       <span className="browse-back">
-                        {hideBack ? <span className="browse-hidden">？</span> : browse.back(item)}
+                        {hideBack ? (
+                          <span className="browse-hidden">？</span>
+                        ) : image ? (
+                          <img
+                            className="geography-map"
+                            src={image.src}
+                            width={image.width}
+                            height={image.height}
+                            alt={image.alt}
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          browse.back(item)
+                        )}
                         {reviewIds.has(item.id) && (
                           <span className="history-badge browse-review">復習</span>
                         )}
@@ -213,6 +229,19 @@ export function Browse<I extends Item, P extends Pattern>({
             </ul>
           </section>
         ))}
+        {browse.credit && (
+          <p className="browse-credit">
+            {browse.credit.text}
+            {/* 文の長さによらず、リンクは文の次の行から並べる */}
+            <span className="browse-credit-links">
+              {browse.credit.links.map((link) => (
+                <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer">
+                  {link.label}
+                </a>
+              ))}
+            </span>
+          </p>
+        )}
       </main>
       {fromResult && (
         <BottomBar>

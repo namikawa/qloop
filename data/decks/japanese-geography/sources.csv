@@ -1,0 +1,111 @@
+﻿id,title,url,license,usage,checkedOn
+terrain-gsi-gazetteer,国土地理院 地名集日本2021,https://www.gsi.go.jp/kihonjohochousa/gazetteer.html,国土地理院コンテンツ利用規約に従う。座標数値を参照し独自作図。,掲載対象の地名・注記位置の照合。範囲境界の根拠には用いない。2026年3月24日正誤表の5件は本対象外・座標訂正なし。,2026-10-17
+terrain-gsi-atlas,国土地理院 日本国勢地図帳 地形分類,https://www.gsi.go.jp/atlas/archive/j-atlas-d_2j_02.pdf,国土地理院コンテンツ利用規約に従う。図版を転載せず独自作図。,全国地形分類図を目視して山地・平野・盆地・台地の大まかな配置を照合。個別の厳密な地形境界ではない。,2026-10-17
+terrain-gsi-typical,国土地理院 日本の典型地形 大地形,https://www.gsi.go.jp/kikaku/tenkei_daichikei.html,国土地理院コンテンツ利用規約に従う。説明・位置を参照。,山地・山脈・台地・平野の位置、地形分類を照合。地図リンクの中心は形状境界として扱わない。,2026-10-17
+terrain-gsi-peaks,国土地理院 立体地図 日本の主な山岳,https://maps.gsi.go.jp/3d/mountain/mountain.html,国土地理院コンテンツ利用規約に従う。山頂座標数値を参照。,対象18山の代表山頂の緯度経度を掲載地図リンクから抽出。穂高岳は奥穂高岳、大雪山は旭岳、阿蘇山は高岳、霧島山は韓国岳、桜島は北岳を代表点とする。,2026-10-17
+terrain-gsi-hokkai,国土地理院 日本の典型地形 北海道,https://www.gsi.go.jp/kikaku/tenkei_hokkai.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,掲載地形と周辺市町村の位置関係を照合。輪郭は資料の厳密境界ではなく教材用の手動概略。,2026-10-17
+terrain-gsi-tohoku,国土地理院 日本の典型地形 東北地方,https://www.gsi.go.jp/kikaku/tenkei_tohoku.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,掲載地形と周辺市町村の位置関係を照合。輪郭は資料の厳密境界ではなく教材用の手動概略。,2026-10-17
+terrain-gsi-kanto,国土地理院 日本の典型地形 関東地方,https://www.gsi.go.jp/kikaku/tenkei_kanto.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,掲載地形と周辺市町村の位置関係を照合。輪郭は資料の厳密境界ではなく教材用の手動概略。,2026-10-17
+terrain-gsi-hokuriku,国土地理院 日本の典型地形 北陸地方,https://www.gsi.go.jp/kikaku/tenkei_hokuriku.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,掲載地形と周辺市町村の位置関係を照合。輪郭は資料の厳密境界ではなく教材用の手動概略。,2026-10-17
+terrain-gsi-chubu,国土地理院 日本の典型地形 中部地方,https://www.gsi.go.jp/kikaku/tenkei_chubu.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,掲載地形と周辺市町村の位置関係を照合。輪郭は資料の厳密境界ではなく教材用の手動概略。,2026-10-17
+terrain-gsi-kinki,国土地理院 日本の典型地形 近畿地方,https://www.gsi.go.jp/kikaku/tenkei_kinki.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,掲載地形と周辺市町村の位置関係を照合。輪郭は資料の厳密境界ではなく教材用の手動概略。,2026-10-17
+terrain-gsi-chugoku,国土地理院 日本の典型地形 中国地方,https://www.gsi.go.jp/kikaku/tenkei_chugoku.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,掲載地形と周辺市町村の位置関係を照合。輪郭は資料の厳密境界ではなく教材用の手動概略。,2026-10-17
+terrain-gsi-shikoku,国土地理院 日本の典型地形 四国地方,https://www.gsi.go.jp/kikaku/tenkei_shikoku.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,掲載地形と周辺市町村の位置関係を照合。輪郭は資料の厳密境界ではなく教材用の手動概略。,2026-10-17
+terrain-gsi-kyushu,国土地理院 日本の典型地形 九州地方,https://www.gsi.go.jp/kikaku/tenkei_kyushu.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,掲載地形と周辺市町村の位置関係を照合。輪郭は資料の厳密境界ではなく教材用の手動概略。,2026-10-17
+terrain-gsi-shirasu,国土地理院 火山の活動による地形,https://www.gsi.go.jp/kikaku/tenkei_kazan.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,火砕流台地の定義、南九州のシラス台地群、笠野原(鹿屋市)の位置を確認。,2026-10-17
+terrain-green-saga,森林研究・整備機構 佐賀県の地勢・地質・気候,https://www.green.go.jp/seibi/kyushu/chisei_chishitsu_kiko/saga/saga.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,佐賀平野が広義の筑紫平野西部に当たる関係を確認。,2026-10-17
+terrain-mlit-kamikawa,国土交通省 旭川と上川盆地の地質,https://www.mlit.go.jp/tagengo-db/R6-00282.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,旭川を中心とする上川盆地の形成と周囲の山地の関係を照合。厳密な境界の資料ではない。,2026-10-17
+terrain-mlit-mogami,国土交通省 最上川 全体概要,https://www.thr.mlit.go.jp/yamagata/river/enc/genre/01-kiso/kiso0102_001.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,米沢→山形→新庄の盆地列、山地と庄内平野の配置を照合。輪郭は地形分類図を基に独自簡略化。,2026-10-17
+terrain-mlit-abukuma,国土交通省 阿武隈川水系 流域及び河川の概要,https://www.mlit.go.jp/common/000225382.pdf,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,福島・郡山の盆地と阿武隈川の関係を本文で照合。厳密境界の抽出はしていない。,2026-10-17
+terrain-mlit-agagawa,国土交通省 阿賀川の歴史,https://www.hrr.mlit.go.jp/agagawa/river/history_chisuikouji.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,阿賀川が会津盆地を貫流し喜多方市山崎地先で山間狭窄部へ入る位置関係を照合。,2026-10-17
+terrain-gsi-suwa,国土地理院 土地条件調査報告 諏訪,https://www1.gsi.go.jp/geowww/landcondition/report/D001-A01-0152u.pdf,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,諏訪盆地の北西-南東方向、松本盆地南端との関係、天竜川・伊那盆地・木曽/赤石山脈の関係を本文で照合。,2026-10-17
+terrain-mlit-chikuma,国土交通省 千曲川の概要,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0406_chikuma/0406_chikuma_00.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,佐久盆地、上田盆地、長野盆地(善光寺平)、犀川合流と立ヶ花狭窄部の位置関係を照合。,2026-10-17
+terrain-mlit-tenryu,国土交通省 天竜川について,https://www.cbr.mlit.go.jp/kawatomizu/kasen/tenryuugawa/tenryuugawa.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,天竜川・伊那谷が木曽山脈と赤石山脈の間にあることを確認。両山脈の帯を接続しない。,2026-10-17
+terrain-mlit-kofu,国土交通省 甲府河川国道事務所 富士川の今,https://www.ktr.mlit.go.jp/koufu/koufu00035.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,甲府盆地と周囲の山地、釜無川が盆地西部を流れる関係を照合。,2026-10-17
+terrain-mlit-kinki,国土交通省 土地分類基本調査 京都 説明書,https://nlftp.mlit.go.jp/kokjo/inspect/landclassification/land/land_history_2011/mapdata/523524/523524_REF.pdf,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,京都・奈良・近江の盆地と大阪平野の配置を地形説明・図版説明で照合。地形分類図に基づく概略輪郭であり、調査地域境界を転用しない。,2026-10-17
+terrain-mlit-maruyama,国土交通省 円山川水系 河川整備計画,https://www.kkr.mlit.go.jp/toyooka/kasen/plan/sjal7q00000035c6-att/39_KASENSEIBI_KEIKAKU.pdf,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,豊岡盆地は円山川下流の幅約3km・長さ約12kmの盆地であることを確認し、概略輪郭を細長く補正。,2026-10-17
+terrain-mlit-yoshii,国土交通省 吉井川の概要,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0703_yoshii/0703_yoshii_00.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,津山盆地を東流したのち岡山平野へ流下する位置関係を本文で照合。,2026-10-17
+terrain-mlit-gouno,国土交通省 江の川流域の概要,https://www.cgr.mlit.go.jp/miyoshi/river/about/summary.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,江の川上流の三次盆地と三川合流部の関係を確認。,2026-10-17
+terrain-mlit-kuma,国土交通省 球磨川の歴史,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0911_kumagawa/0911_kumagawa_01.html,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,球磨川上流の人吉・球磨盆地の位置を確認。厳密境界の資料ではない。,2026-10-17
+terrain-mlit-oyodo,国土交通省 大淀川流域の概要,https://www.qsr.mlit.go.jp/miyazaki/kasen/oyodo/gaiyou/,公開一次資料の説明・位置を参照し独自作図。図版の転載なし。,都城盆地と霧島山系、山間狭窄部、宮崎平野の位置関係を照合。,2026-10-17
+terrain-ishikari-city,石狩市 石狩平野と周囲の地形,https://www.city.ishikari.hokkaido.jp/museum/1001801/1004573/1004719.html,公開一次資料の地形説明を参照。図版の転載なし。,既存geography-samples/features.jsonの石狩平野の概略面を再利用。同サンプルが参照した石狩市の平野範囲説明・図に由来する。今回このリンクの本文は再確認していない。,2026-10-16
+water-gsi-gazetteer,国土地理院 地名集日本（2021）,https://www.gsi.go.jp/common/000238259.pdf,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,地名と概略位置の照合。地図の注記位置であり源流・河口・湖岸を保証しない。,2026-10-17
+water-ne-rivers,Natural Earth 1:10m Rivers + Lake Centerlines,https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_rivers_lake_centerlines.geojson,Public domain (Natural Earth).,利根川・石狩川・最上川の本流座標。,2026-10-17
+water-ne-lakes,Natural Earth 1:10m Lakes + Reservoirs,https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_lakes.geojson,Public domain (Natural Earth).,琵琶湖の簡略化された湖岸。,2026-10-17
+water-gsi-maps,国土地理院 地理院地図,https://maps.gsi.go.jp/,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,湖岸の主要屈曲点と河川の下流・河口・合流位置を標準地図タイルで目視し、手作業で概略化。,2026-10-17
+water-river-108,国土交通省 日本の川 信濃川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0405_shinano/0405_shinano_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-109,国土交通省 日本の川 利根川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0316_tonegawa/0316_tonegawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-110,国土交通省 日本の川 石狩川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0109_ishikari/0109_ishikari_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-111,国土交通省 日本の川 木曽川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0509_kiso/0509_kiso_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-112,国土交通省 日本の川 長良川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0509_kiso/0509_kiso_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-113,国土交通省 日本の川 揖斐川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0509_kiso/0509_kiso_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-114,国土交通省 日本の川 淀川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0616_yodogawa/0616_yodogawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-115,国土交通省 日本の川 最上川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0211_mogami/0211_mogami_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-116,国土交通省 日本の川 筑後川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0916_chikugo/0916_chikugo_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-117,国土交通省 日本の川 北上川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0204_kitakami/0204_kitakami_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-118,国土交通省 日本の川 十勝川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0106_tokachi/0106_tokachi_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-119,国土交通省 日本の川 阿賀野川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0402_agano/0402_agano_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-120,国土交通省 日本の川 雄物川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0209_omono/0209_omono_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-121,国土交通省 日本の川 天竜川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0505_tenryu/0505_tenryu_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-122,国土交通省 日本の川 大井川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0503_ooigawa/0503_ooigawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-123,国土交通省 日本の川 富士川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0315_fujigawa/0315_fujigawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-124,国土交通省 日本の川 吉野川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0801_yoshino/0801_yoshino_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-125,国土交通省 日本の川 四万十川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0805_shimanto/0805_shimanto_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-126,国土交通省 日本の川 球磨川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0911_kumagawa/0911_kumagawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-127,国土交通省 日本の川 大淀川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0908_ooyodo/0908_ooyodo_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-128,国土交通省 日本の川 渡良瀬川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0313_watarase/0313_watarase_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-129,国土交通省 日本の川 荒川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0306_arakawa/0306_arakawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-130,国土交通省 日本の川 多摩川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0310_tamagawa/0310_tamagawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-131,国土交通省 日本の川 阿武隈川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0207_abukuma/0207_abukuma_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-132,国土交通省 日本の川 天塩川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0110_teshio/0110_teshio_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-133,国土交通省 日本の川 米代川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0208_yoneshiro/0208_yoneshiro_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-134,国土交通省 日本の川 黒部川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0409_kurobe/0409_kurobe_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-135,国土交通省 日本の川 神通川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0411_jintsu/0411_jintsu_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-136,国土交通省 日本の川 紀ノ川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0604_kinokawa/0604_kinokawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-137,国土交通省 日本の川 高梁川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0706_takahashi/0706_takahashi_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-138,国土交通省 日本の川 太田川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0710_ootagawa/0710_ootagawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-139,国土交通省 日本の川 江戸川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0305_edogawa/0305_edogawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-140,国土交通省 日本の川 鬼怒川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0303_kinugawa/0303_kinugawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-141,国土交通省 日本の川 岩木川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0201_iwaki/0201_iwaki_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-142,国土交通省 日本の川 釧路川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0105_kushiro/0105_kushiro_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-143,国土交通省 日本の川 常願寺川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0410_joganji/0410_joganji_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-144,国土交通省 日本の川 庄川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0412_shogawa/0412_shogawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-145,国土交通省 日本の川 吉井川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0703_yoshii/0703_yoshii_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-146,国土交通省 日本の川 旭川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0701_asahi/0701_asahi_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-147,国土交通省 日本の川 江の川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0704_gounokawa/0704_gounokawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-148,国土交通省 日本の川 相模川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0309_sagami/0309_sagami_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-149,国土交通省 日本の川 熊野川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0606_kumano/0606_kumano_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-150,有田川水系河川整備基本方針,https://www.pref.wakayama.lg.jp/prefg/080400/hoshin/kihonhosin_d/fil/aridagawa-kihonhosin.pdf,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-151,国土交通省 日本の川 川内川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0910_sendai/0910_sendai_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-152,国土交通省 日本の川 阿賀川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0403_agagawa/0403_agagawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-153,国土交通省 千曲川河川事務所 犀川上流,https://www.hrr.mlit.go.jp/chikuma/shiru/sora/saigawa_upper/index.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-154,国土交通省 日本の川 肱川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0806_hijikawa/0806_hijikawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-155,国土交通省 日本の川 大分川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0903_ooita/0903_ooita_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-156,国土交通省 日本の川 千曲川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0406_chikuma/0406_chikuma_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-157,国土交通省 日本の川 瀬田川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0608_setagawa/0608_setagawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-158,国土交通省 日本の川 宇治川,https://www.mlit.go.jp/river/toukei_chousa/kasen/jiten/nihon_kawa/0601_ujigawa/0601_ujigawa_00.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-river-159,東京都建設局 隅田川,https://www.kensetsu.metro.tokyo.lg.jp/river/kankyo/ikimono/river/river_suikei_arakawa/river_sumidagawa,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,源流・合流・河口と名称区間を確認。測量座標の転載ではない。,2026-10-17
+water-lake-161,国土地理院 地理院地図 霞ヶ浦,https://maps.gsi.go.jp/#11/36.033333/140.4/&base=std&ls=std&disp=1,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,標準地図z11の湖岸の主要屈曲点を目視し、独自の粗い輪郭へ概略化。,2026-10-17
+water-lake-162,国土地理院 地理院地図 サロマ湖,https://maps.gsi.go.jp/#11/44.133333/143.8/&base=std&ls=std&disp=1,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,標準地図z11の湖岸の主要屈曲点を目視し、独自の粗い輪郭へ概略化。,2026-10-17
+water-lake-163,国土地理院 地理院地図 猪苗代湖,https://maps.gsi.go.jp/#11/37.466667/140.1/&base=std&ls=std&disp=1,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,標準地図z11の湖岸の主要屈曲点を目視し、独自の粗い輪郭へ概略化。,2026-10-17
+water-lake-164,国土地理院 地理院地図 田沢湖,https://maps.gsi.go.jp/#11/39.733333/140.666667/&base=std&ls=std&disp=1,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,標準地図z11の湖岸の主要屈曲点を目視し、独自の粗い輪郭へ概略化。,2026-10-17
+water-lake-165,国土地理院 地理院地図 浜名湖,https://maps.gsi.go.jp/#11/34.75/137.566667/&base=std&ls=std&disp=1,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,標準地図z11の湖岸の主要屈曲点を目視し、独自の粗い輪郭へ概略化。,2026-10-17
+water-lake-166,国土地理院 地理院地図 宍道湖,https://maps.gsi.go.jp/#11/35.45/132.95/&base=std&ls=std&disp=1,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,標準地図z11の湖岸の主要屈曲点を目視し、独自の粗い輪郭へ概略化。,2026-10-17
+water-lake-167,国土地理院 地理院地図 屈斜路湖,https://maps.gsi.go.jp/#11/43.633333/144.333333/&base=std&ls=std&disp=1,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,標準地図z11の湖岸の主要屈曲点を目視し、独自の粗い輪郭へ概略化。,2026-10-17
+water-lake-168,国土地理院 地理院地図 十和田湖,https://maps.gsi.go.jp/#11/40.466667/140.883333/&base=std&ls=std&disp=1,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,標準地図z11の湖岸の主要屈曲点を目視し、独自の粗い輪郭へ概略化。,2026-10-17
+water-lake-169,国土地理院 地理院地図 諏訪湖,https://maps.gsi.go.jp/#11/36.05/138.083333/&base=std&ls=std&disp=1,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,標準地図z11の湖岸の主要屈曲点を目視し、独自の粗い輪郭へ概略化。,2026-10-17
+water-lake-170,国土地理院 地理院地図 洞爺湖,https://maps.gsi.go.jp/#11/42.616667/140.85/&base=std&ls=std&disp=1,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,標準地図z11の湖岸の主要屈曲点を目視し、独自の粗い輪郭へ概略化。,2026-10-17
+water-lake-171,国土地理院 地理院地図 摩周湖,https://maps.gsi.go.jp/#11/43.583333/144.533333/&base=std&ls=std&disp=1,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,標準地図z11の湖岸の主要屈曲点を目視し、独自の粗い輪郭へ概略化。,2026-10-17
+water-lake-172,国土地理院 地理院地図 中海,https://maps.gsi.go.jp/#11/35.466667/133.183333/&base=std&ls=std&disp=1,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,標準地図z11の湖岸の主要屈曲点を目視し、独自の粗い輪郭へ概略化。,2026-10-17
+water-jma-currents,気象庁 海流に関する診断表、予報、データ,https://www.data.jma.go.jp/kaiyou/shindan/index_curr.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,黒潮・親潮・対馬暖流の分布と方向。日々の実況値を転載せず教材用の概略経路を独自定義。,2026-10-17
+water-jma-current-description,気象庁 海流の診断の見方,https://www.data.jma.go.jp/kaiyou/data/shindan/c_1/jpn_jun/intro_jpn_jun_cur.html,政府標準利用規約（出典明記）。参照資料の説明・位置を根拠とする独自概略データ。,黒潮系暖水・親潮・対馬暖流の海域、変動する流路・分枝・水塊境界の確認。,2026-10-17
+water-akashi-meridian,明石市立天文科学館 東経135度と日本標準時,https://www.am12.jp/135-jstm/,事実の参照。掲載文章・図版の転載なし。,日本標準時の基準となる子午線。経度一定の幾何学的な線として独自描画。,2026-10-17
+places-gsi-gazetteer,国土地理院 地名集日本（2021年更新・2026年正誤表確認）,https://www.gsi.go.jp/kihonjohochousa/gazetteer.html,国土地理院コンテンツ利用規約（政府標準利用規約第2.0版準拠）,地名・注記位置の照合。地形の厳密境界ではない。,2026-10-17
+places-natural-earth-land,Natural Earth 1:10m Land,https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_10m_land.geojson,Public domain,日本・周辺国の海岸線、島輪郭。関係範囲を抽出し簡略化。,2026-10-17
+places-gsi-capitals,国土地理院 都道府県と都道府県庁所在地,https://www.gsi.go.jp/CHIRIKYOUIKU/todofuken.html,国土地理院コンテンツ利用規約,都道府県庁所在地の標準解答を照合。,2026-10-17
+places-tokyo-office,東京都庁の所在地,https://www.seisakukikaku.metro.tokyo.lg.jp/about/syozaichi,参照のみ,都庁所在位置を照合。標準解答は東京。,2026-10-17
+places-gsi-maps,地理院地図,https://maps.gsi.go.jp/,国土地理院コンテンツ利用規約,地名集と表記が異なる地名、海岸、砂丘、海域の位置関係の参照。概略位置は教材用に設定。,2026-10-17
+places-natural-earth-admin,Natural Earth Admin 1 States Provinces 1:10m,https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_10m_admin_1_states_provinces.geojson,Public domain,日本47都道府県の共有辺のみ県境に使用。島の所属を表す面塗りには使用しない。,2026-10-17
+places-tahara-profile,田原市の位置と自然条件,https://www.city.tahara.aichi.jp/seisaku/profile/1001448.html,参照のみ,渥美半島の北側が三河湾、南側が太平洋に面し、東側を豊橋市と接する位置関係と田原市位置を照合。,2026-10-17
+places-chiba-parks,千葉県の自然公園一覧表,https://www.pref.chiba.lg.jp/shizen/kouen/shizenkouen/chiba.html,参照のみ,九十九里浜の範囲を刑部岬から太東岬までとする説明を照合。,2026-10-17
+places-jcg-cho-lights,銚子海上保安部 灯台等の航路標識について,https://www.kaiho.mlit.go.jp/03kanku/choshi/main_lh.html,参照のみ,飯岡灯台・太東埼灯台の度分秒座標を九十九里浜の強調線端点の位置照合に使用。,2026-10-17

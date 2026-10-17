@@ -3,6 +3,7 @@ import type { EventScope, Item } from './models';
 /** 一覧で使う教材の種類ごとの差分。表示する文字と並びをここを通して扱う。 */
 export interface BrowseRules<I extends Item> {
   readonly groups: readonly string[];
+  readonly chipColumns?: number;
   groupOf(item: I): string;
   readonly browse: {
     readonly name: string;
@@ -15,6 +16,8 @@ export interface BrowseRules<I extends Item> {
     reading(item: I): string | null;
     back(item: I): string;
     compare(a: I, b: I): number;
+    image?(item: I): { src: string; width: number; height: number; alt: string };
+    credit?: { text: string; links: readonly { label: string; href: string }[] };
   };
 }
 

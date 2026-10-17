@@ -37,6 +37,7 @@ const test = base.extend<{ updateServer: UpdateServer }>({
       const match = script.match(/\.addToCacheList\((\[[\s\S]*?\])\)/);
       if (!match) throw new Error('sw.js に事前キャッシュの一覧がありません');
       const entries = JSON.parse(match[1]) as Entry[];
+      expect(entries.filter((entry) => /^geography\/.*\.webp$/.test(entry.url))).toHaveLength(310);
       const headersText = (await readFile(resolve('public/_headers'), 'utf8')).trimEnd();
       const [scope, ...headerLines] = headersText.split(/\r?\n/);
       if (scope !== '/*') throw new Error('_headers の先頭が /* ではありません');
@@ -53,6 +54,7 @@ const test = base.extend<{ updateServer: UpdateServer }>({
         '.css': 'text/css',
         '.svg': 'image/svg+xml',
         '.png': 'image/png',
+        '.webp': 'image/webp',
         '.webmanifest': 'application/manifest+json',
         '.txt': 'text/plain',
       };
@@ -263,14 +265,19 @@ test('手動の取り込みが 500 で失敗したら横棒を消し、失敗の
 }) => {
   await controlledHome(page, updateServer.url);
   updateServer.switchToVersion2(true);
-  const origin = await page.evaluate(() => performance.timeOrigin);
+  // WebKit では performance.timeOrigin がまれに 1 ms ずれるため、window の目印で確認する。
+  await page.evaluate(() => {
+    (window as Window & { __qloopNoReload?: string }).__qloopNoReload = 'before';
+  });
   await updateButton(page).click();
   await expectProgress(page, page.locator('.footer').filter({ hasText: LOADING }));
   await expect(topProgress(page, LOADING)).toHaveCount(0);
   await expect(page.getByRole('status').filter({ hasText: FAILED })).toBeVisible();
   await expect(page.getByRole('progressbar')).toHaveCount(0);
   await expect(updateButton(page)).toBeEnabled();
-  expect(await page.evaluate(() => performance.timeOrigin)).toBe(origin);
+  expect(
+    await page.evaluate(() => (window as Window & { __qloopNoReload?: string }).__qloopNoReload),
+  ).toBe('before');
 });
 
 test('起動時の取り込みが 500 で失敗したら横棒の帯だけを消す', async ({ page, updateServer }) => {
@@ -293,7 +300,10 @@ test('手動の取り込み中にホームを離れると完了しても切り�
 }) => {
   await controlledHome(page, updateServer.url);
   updateServer.switchToVersion2();
-  const origin = await page.evaluate(() => performance.timeOrigin);
+  // WebKit では performance.timeOrigin がまれに 1 ms ずれるため、window の目印で確認する。
+  await page.evaluate(() => {
+    (window as Window & { __qloopNoReload?: string }).__qloopNoReload = 'before';
+  });
   await updateButton(page).click();
   await expectProgress(page, page.locator('.footer').filter({ hasText: LOADING }));
   await page.getByRole('button', { name: '出題', exact: true }).click();
@@ -308,6 +318,8 @@ test('手動の取り込み中にホームを離れると完了しても切り�
   await expect(
     page.locator('.banner').filter({ hasText: '新しいバージョンがあります' }),
   ).toBeVisible();
-  expect(await page.evaluate(() => performance.timeOrigin)).toBe(origin);
+  expect(
+    await page.evaluate(() => (window as Window & { __qloopNoReload?: string }).__qloopNoReload),
+  ).toBe('before');
   await expectVersion(page, context, 1);
 });

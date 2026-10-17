@@ -253,6 +253,7 @@ export function Home({
                 legendHidden
                 name="deck"
                 options={decks.map((deck) => ({ value: deck.id, label: deck.name }))}
+                columns={decks.length === 4 ? 2 : undefined}
                 value={deckId}
                 onChange={onSelectDeck}
                 // 読み込み中は lastDeck に保存できないので、他のボタンと同じく押せなくする

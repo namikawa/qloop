@@ -1,3 +1,5 @@
+import { normalizeGeographySettings } from '../core/geography';
+import type { GeographySettings } from '../core/models';
 import type { IDBPTransaction } from 'idb';
 import { localDateKey } from '../core/date';
 import type {
@@ -302,10 +304,24 @@ export class ProgressStore {
   getSettings(deckId: string, kind?: 'timeline'): Settings | null;
   getSettings(deckId: string, kind: 'vocabulary'): VocabularySettings | null;
   getSettings(deckId: string, kind: 'english'): EnglishSettings | null;
+  getSettings(deckId: string, kind: 'geography'): GeographySettings | null;
   getSettings(deckId: string, kind: DeckKind = 'timeline'): DeckSettings | null {
     const settings =
       this.settings.get(deckId) ?? (deckId === LEGACY_DECK_ID ? this.legacySettings : null);
     if (settings === null) return null;
+    if (kind === 'geography') {
+      if (
+        (settings.pattern === 'geoNameChoice' ||
+          settings.pattern === 'geoNameInput' ||
+          settings.pattern === 'mixed') &&
+        (settings.range.kind === 'all' || settings.range.kind === 'categories') &&
+        'scope' in settings &&
+        (settings.scope === 'core' || settings.scope === 'all')
+      ) {
+        return normalizeGeographySettings(settings as GeographySettings);
+      }
+      return null;
+    }
     if (kind === 'english') {
       if (
         (settings.pattern === 'englishMeaningChoice' ||

@@ -1,3 +1,14 @@
+import {
+  buildGeographyDeck,
+  buildQuestion as buildGeographyQuestion,
+  isEligibleFor as isGeographyEligibleFor,
+  geographyGroup,
+  geographyImageUrl,
+  GEOGRAPHY_GROUPS,
+  GEOGRAPHY_IMAGE_WIDTH,
+  GEOGRAPHY_IMAGE_HEIGHT,
+  formatGeographyRange,
+} from './geography';
 import type { BrowseRules } from './browse';
 import { buildDeck } from './deck';
 import {
@@ -13,6 +24,11 @@ import {
 } from './english';
 import { ERAS } from './era';
 import {
+  GEOGRAPHY_PATTERNS,
+  type GeoPlace,
+  type GeographyDeck,
+  type GeographyPattern,
+  type GeographyPatternMode,
   ENGLISH_PATTERNS,
   TIMELINE_PATTERNS,
   VOCABULARY_PATTERNS,
@@ -97,6 +113,13 @@ export const DECK_DEFINITIONS: readonly DeckDefinition[] = [
     dir: 'english-words',
     hasPool: false,
   },
+  {
+    id: 'japanese-geography',
+    kind: 'geography',
+    name: '日本地理',
+    idPrefix: 'jg-',
+    dir: 'japanese-geography',
+  },
 ];
 
 export type BuildDeckFromCsvResult = { ok: true; deck: Deck } | { ok: false; errors: string[] };
@@ -110,6 +133,8 @@ export function buildDeckFromCsv(
   files: { core: string; pool?: string },
 ): BuildDeckFromCsvResult {
   switch (definition.kind) {
+    case 'geography':
+      return buildGeographyDeck({ ...definition, ...files, pool: files.pool ?? '' });
     case 'english':
       return buildEnglishDeck({ ...definition, core: files.core });
     case 'vocabulary':
@@ -318,15 +343,86 @@ export function englishRules(
 }
 
 /** 教材と、その種類の差分・母集団。画面はこれを通して教材を扱う。 */
-export type DeckModel = TimelineDeckModel | VocabularyDeckModel | EnglishDeckModel;
+export interface GeographyDeckModel {
+  kind: 'geography';
+  deck: GeographyDeck;
+  rules: KindRules<GeoPlace, GeographyPattern>;
+  population: GeoPlace[];
+}
+const GEOGRAPHY_PATTERN_LABELS: Readonly<Record<GeographyPatternMode, string>> = {
+  geoNameChoice: '名前 4 択',
+  geoNameInput: '名前入力',
+  mixed: 'ミックス',
+};
+const geographyDetail = (place: GeoPlace) =>
+  [place.category, place.regions.join('／')].filter(Boolean).join(' · ');
+export const GEOGRAPHY_RULES: KindRules<GeoPlace, GeographyPattern> = {
+  kind: 'geography',
+  labels: { item: '地名', core: '基本の地名', group: '分類' },
+  patterns: GEOGRAPHY_PATTERNS,
+  patternLabel: (pattern) => GEOGRAPHY_PATTERN_LABELS[pattern as GeographyPatternMode] ?? pattern,
+  formatRange: formatGeographyRange,
+  isEligibleFor: isGeographyEligibleFor,
+  buildQuestion: buildGeographyQuestion,
+  groups: GEOGRAPHY_GROUPS.map((group) => group.name),
+  chipColumns: 2,
+  groupOf: geographyGroup,
+  groupHeading: () => null,
+  groupChipLabel: (group) => group,
+  browseRangeText: (selected) =>
+    selected.length
+      ? formatGeographyRange({ kind: 'categories', categories: [...selected] })
+      : 'すべての分類',
+  itemTitle: (place) => place.name,
+  itemReading: (place) => place.reading,
+  itemDetail: (place) => `${place.reading} · ${geographyDetail(place)}`,
+  resultLayout: 'stacked',
+  answerText: geographyDetail,
+  browse: {
+    name: '地図で覚える',
+    layout: 'stacked',
+    hideOptions: [
+      { value: 'front', label: '名前' },
+      { value: 'back', label: '地図' },
+    ],
+    front: (place) => place.name,
+    reading: (place) => place.reading,
+    back: () => '',
+    compare: () => 0,
+    image: (place) => ({
+      src: geographyImageUrl(place.id),
+      width: GEOGRAPHY_IMAGE_WIDTH,
+      height: GEOGRAPHY_IMAGE_HEIGHT,
+      alt: '地図',
+    }),
+    credit: {
+      text: '地図は、Natural Earth（パブリックドメイン）と、国土地理院ウェブサイト・地理院タイルなどの資料をもとに、このアプリ用に独自に作成した概略図です。',
+      links: [
+        { label: '国土地理院ウェブサイト', href: 'https://www.gsi.go.jp/' },
+        { label: '地理院タイル一覧', href: 'https://maps.gsi.go.jp/development/ichiran.html' },
+        { label: 'Natural Earth', href: 'https://www.naturalearthdata.com/' },
+      ],
+    },
+  },
+};
+export type DeckModel =
+  TimelineDeckModel | VocabularyDeckModel | EnglishDeckModel | GeographyDeckModel;
 
 /** 教材の種類の差分を組み合わせる（教材の種類で振り分ける）。 */
 export function deckModel(deck: TimelineDeck): TimelineDeckModel;
 export function deckModel(deck: VocabularyDeck): VocabularyDeckModel;
 export function deckModel(deck: EnglishDeck): EnglishDeckModel;
+export function deckModel(deck: GeographyDeck): GeographyDeckModel;
 export function deckModel(deck: Deck): DeckModel;
 export function deckModel(deck: Deck): DeckModel {
   switch (deck.kind) {
+    case 'geography':
+      return {
+        kind: 'geography',
+        deck,
+        rules: GEOGRAPHY_RULES,
+        population: population(deck.items),
+      };
     case 'english': {
       const targets = population(deck.items);
       return { kind: 'english', deck, rules: englishRules(targets), population: targets };

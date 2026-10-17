@@ -30,17 +30,29 @@ for (const width of [375, 402]) {
       const deck = page.locator('section.deck');
       const streak = page.getByTestId('home-streak');
       await expect(streak).toBeVisible();
-      for (const name of ['日本史年表', '語彙', '英単語']) {
+      for (const name of ['日本史年表', '語彙', '英単語', '日本地理']) {
         await radio(page, name).check();
         await expect(deck.getByRole('group', { name: '教材', exact: true })).toBeVisible();
-        await expect(deck.getByRole('radio')).toHaveCount(3);
+        await expect(deck.getByRole('radio')).toHaveCount(4);
         await expect(deck.getByRole('heading', { level: 2, name, exact: true })).toBeVisible();
         await expect(deck.getByTestId('target-count')).toContainText(
-          name === '英単語' ? '英単語' : name === '語彙' ? '言葉' : '出来事',
+          name === '英単語'
+            ? '英単語'
+            : name === '語彙'
+              ? '言葉'
+              : name === '日本地理'
+                ? '地名'
+                : '出来事',
         );
         for (const action of [
           '出題',
-          name === '英単語' ? '英単語を覚える' : name === '語彙' ? '言葉を覚える' : '年表を覚える',
+          name === '英単語'
+            ? '英単語を覚える'
+            : name === '語彙'
+              ? '言葉を覚える'
+              : name === '日本地理'
+                ? '地図で覚える'
+                : '年表を覚える',
           '復習',
           '成績',
         ]) {
@@ -164,7 +176,7 @@ test('ホームから全教材の記録の管理を開き、説明と 3 つの�
   await openRecords(page);
   await expect(page.getByTestId('screen-deck')).toHaveCount(0);
   await expect(page.locator('.hint')).toHaveText(
-    '日本史年表・語彙・英単語の学習の記録を、まとめて書き出し・読み込み・リセットします。',
+    '日本史年表・語彙・英単語・日本地理の学習の記録を、まとめて書き出し・読み込み・リセットします。',
   );
   await expect(page.getByRole('heading', { name: '記録の管理', exact: true })).toHaveCount(1);
   await expect(page.locator('.records .record-row')).toHaveText([
@@ -178,9 +190,9 @@ test('ホームから全教材の記録の管理を開き、説明と 3 つの�
   await expect(radio(page, '英単語')).toBeChecked();
 });
 
-test('3 つの教材の成績には記録の管理と全教材の操作の注意書きが無い', async ({ page }) => {
+test('4 つの教材の成績には記録の管理と全教材の操作の注意書きが無い', async ({ page }) => {
   await page.goto('/');
-  for (const name of ['日本史年表', '語彙', '英単語']) {
+  for (const name of ['日本史年表', '語彙', '英単語', '日本地理']) {
     await radio(page, name).check();
     await page.getByRole('button', { name: '成績', exact: true }).click();
     await expect(page.getByRole('heading', { level: 1, name: '成績' })).toBeVisible();

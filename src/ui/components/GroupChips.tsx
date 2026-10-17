@@ -3,12 +3,14 @@ import { CheckIcon } from './icons';
 /** 本の見出しと単位のチップ。見出しの無い教材では従来のチップだけを並べる。 */
 export function GroupChips({
   groups,
+  columns,
   groupHeading,
   groupChipLabel,
   selected,
   onToggle,
 }: {
   groups: readonly string[];
+  columns?: number;
   groupHeading: (group: string) => string | null;
   groupChipLabel: (group: string) => string;
   selected: readonly string[];
@@ -18,7 +20,14 @@ export function GroupChips({
   return headings.map((heading) => (
     <div className="chip-group" key={heading ?? ''}>
       {heading !== null && <h3 className="chip-heading">{heading}</h3>}
-      <div className="chip-options">
+      <div
+        className="chip-options"
+        style={
+          columns === undefined
+            ? undefined
+            : { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }
+        }
+      >
         {groups
           .filter((group) => groupHeading(group) === heading)
           .map((group) => (

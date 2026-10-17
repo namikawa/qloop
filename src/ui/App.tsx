@@ -1,3 +1,4 @@
+import { GeographyQuizSetup } from './screens/GeographyQuizSetup';
 import { useEffect, useState } from 'react';
 import { localDateKey } from '../core/date';
 import { deckModel, pickDeck, type DeckModel } from '../core/decks';
@@ -118,6 +119,14 @@ export function App() {
         onStart={startQuiz}
         onBack={goHome}
       />
+    ) : current.kind === 'geography' ? (
+      <GeographyQuizSetup
+        store={store}
+        model={current}
+        deckName={deckName}
+        onStart={startQuiz}
+        onBack={goHome}
+      />
     ) : current.kind === 'english' ? (
       <EnglishQuizSetup
         store={store}
@@ -182,9 +191,11 @@ export function App() {
     const savedScope =
       current.kind === 'timeline'
         ? store.getSettings(deck.id)?.scope
-        : current.kind === 'vocabulary'
-          ? store.getSettings(deck.id, 'vocabulary')?.scope
-          : 'all';
+        : current.kind === 'geography'
+          ? store.getSettings(deck.id, 'geography')?.scope
+          : current.kind === 'vocabulary'
+            ? store.getSettings(deck.id, 'vocabulary')?.scope
+            : 'all';
     const item = current.population.find((item) => item.id === view.highlightId);
     return (
       <Browse<Question['item'], Pattern>

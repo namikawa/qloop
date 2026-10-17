@@ -11,6 +11,7 @@ interface SegmentedProps<T> {
   /** ラジオボタンの name。 */
   name: string;
   options: readonly SegmentedOption<T>[];
+  columns?: number;
   value: T;
   onChange: (value: T) => void;
   /** 操作できなくする（ホームの教材の切り替えで、学習の記録を読み込んでいる間）。 */
@@ -26,6 +27,7 @@ export function Segmented<T extends string | number>({
   legendHidden = false,
   name,
   options,
+  columns = options.length,
   value,
   onChange,
   disabled = false,
@@ -35,7 +37,7 @@ export function Segmented<T extends string | number>({
       <legend className={legendHidden ? 'visually-hidden' : 'field-legend'}>{legend}</legend>
       <div
         className="segmented"
-        style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
+        style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
       >
         {options.map((option) => (
           <label key={option.value} className="segment">

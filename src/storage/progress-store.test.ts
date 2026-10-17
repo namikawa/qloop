@@ -1693,3 +1693,74 @@ describe('英単語の出題設定と記録', () => {
     expect(target.store.listSessions()[0]).toMatchObject({ deckId: 'english-words', range });
   });
 });
+
+describe('日本地理の設定と記録', () => {
+  it.each(['geoNameChoice', 'geoNameInput', 'mixed'] as const)(
+    '%s の設定を保存し、既知のまとめだけを表の順に読み出す',
+    async (pattern) => {
+      const { store, db } = await createStore();
+      const settings = {
+        scope: 'all' as const,
+        pattern,
+        count: 10 as const,
+        range: { kind: 'categories' as const, categories: ['川・湖', '未知', '山地・山脈'] },
+      };
+      await store.saveSettings('japanese-geography', settings);
+      expect(await db.get('meta', 'settings:japanese-geography')).toEqual({
+        key: 'settings:japanese-geography',
+        value: settings,
+      });
+      expect((await createStore(db)).store.getSettings('japanese-geography', 'geography')).toEqual({
+        ...settings,
+        range: { kind: 'categories', categories: ['山地・山脈', '川・湖'] },
+      });
+    },
+  );
+  it('未知のまとめだけなら全範囲に戻し、他種類のパターン・範囲と不正なscopeを拒む', async () => {
+    const { store } = await createStore();
+    const settings = {
+      scope: 'core' as const,
+      pattern: 'geoNameChoice' as const,
+      count: 10 as const,
+      range: { kind: 'categories' as const, categories: ['未知'] },
+    };
+    await store.saveSettings('japanese-geography', settings);
+    expect(store.getSettings('japanese-geography', 'geography')?.range).toEqual({ kind: 'all' });
+    for (const invalid of [
+      { ...settings, pattern: 'meaningChoice' as const },
+      {
+        ...settings,
+        pattern: 'mixed' as const,
+        range: { kind: 'years' as const, from: null, to: null },
+      },
+      { pattern: 'mixed' as const, count: 10 as const, range: { kind: 'all' as const } },
+    ]) {
+      await store.saveSettings('japanese-geography', invalid);
+      expect(store.getSettings('japanese-geography', 'geography')).toBeNull();
+    }
+    expect(store.getSettings('unknown', 'geography')).toBeNull();
+  });
+  it('両パターンとcategoriesの範囲をIndexedDBから書き出し、読み戻して保つ', async () => {
+    const source = await createStore();
+    const range = { kind: 'categories' as const, categories: ['山地・山脈', '川・湖'] };
+    const session = await source.store.startSession({
+      deckId: 'japanese-geography',
+      mode: 'normal',
+      pattern: 'mixed',
+      range,
+      total: 2,
+    });
+    await answer(source.store, session.id, 'jg-0128', 'geoNameChoice', false);
+    await answer(source.store, session.id, 'jg-0140', 'geoNameInput', true, true);
+    const exported = await source.store.exportData();
+    const target = await createStore();
+    await target.store.importData(JSON.parse(JSON.stringify(exported)));
+    expect(target.store.listEventStats()).toEqual(source.store.listEventStats());
+    expect(target.store.listSessions()).toEqual(source.store.listSessions());
+    expect((await target.store.exportData()).attempts.map((attempt) => attempt.pattern)).toEqual([
+      'geoNameChoice',
+      'geoNameInput',
+    ]);
+    expect(target.store.listSessions()[0]).toMatchObject({ deckId: 'japanese-geography', range });
+  });
+});

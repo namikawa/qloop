@@ -61,14 +61,25 @@ export const ENGLISH_PATTERNS: readonly EnglishPattern[] = Object.keys(
 ) as EnglishPattern[];
 export type EnglishPatternMode = EnglishPattern | 'mixed';
 
+export type GeographyPattern = 'geoNameChoice' | 'geoNameInput';
+const GEOGRAPHY_PATTERN_KEYS: Record<GeographyPattern, true> = {
+  geoNameChoice: true,
+  geoNameInput: true,
+};
+export const GEOGRAPHY_PATTERNS: readonly GeographyPattern[] = Object.keys(
+  GEOGRAPHY_PATTERN_KEYS,
+) as GeographyPattern[];
+export type GeographyPatternMode = GeographyPattern | 'mixed';
+
 /** 全種類の教材の出題パターン。回答の記録と書き出しの検証で使う。 */
-export type Pattern = TimelinePattern | VocabularyPattern | EnglishPattern;
+export type Pattern = TimelinePattern | VocabularyPattern | EnglishPattern | GeographyPattern;
 
 /** 全種類の教材の出題パターン（書き出しファイルの検証で使う）。 */
 export const PATTERNS: readonly Pattern[] = [
   ...TIMELINE_PATTERNS,
   ...VOCABULARY_PATTERNS,
   ...ENGLISH_PATTERNS,
+  ...GEOGRAPHY_PATTERNS,
 ];
 
 /** 学習段階。CSV の `level` 列が空なら `中学`。 */
@@ -106,8 +117,8 @@ export interface Event extends Item {
   yearLabel: string | null;
 }
 
-/** 教材の種類（設計書 5 章の冒頭）。`timeline` = 年表、`vocabulary` = 語彙、`english` = 英単語。 */
-export type DeckKind = 'timeline' | 'vocabulary' | 'english';
+/** 教材の種類（設計書 5 章の冒頭）。`timeline` = 年表、`vocabulary` = 語彙、`english` = 英単語、`geography` = 日本地理。 */
+export type DeckKind = 'timeline' | 'vocabulary' | 'english' | 'geography';
 
 /** 年表の教材。 */
 export interface TimelineDeck {
@@ -157,7 +168,24 @@ export interface EnglishDeck {
 }
 
 /** 教材（生成物 `decks.json` の 1 要素）。`kind` で項目の型が決まる。 */
-export type Deck = TimelineDeck | VocabularyDeck | EnglishDeck;
+export interface GeoPlace extends Item {
+  name: string;
+  reading: string;
+  category: string;
+  regions: string[];
+  question: string;
+  note: string | null;
+  altNames: string[];
+  similar: string[];
+  level: '中学';
+}
+export interface GeographyDeck {
+  id: string;
+  kind: 'geography';
+  name: string;
+  items: GeoPlace[];
+}
+export type Deck = TimelineDeck | VocabularyDeck | EnglishDeck | GeographyDeck;
 
 /**
  * セッション開始時に選ぶ出題パターン（設計書 6.1 節の 3）。
@@ -183,7 +211,8 @@ export type VocabularyRange = { kind: 'all' } | { kind: 'categories'; categories
 export type EnglishRange = { kind: 'all' } | { kind: 'categories'; categories: string[] };
 
 /** 全種類の教材の出題範囲（設計書 5.4・5.6 節）。履歴と書き出しに保存する。 */
-export type Range = TimelineRange | VocabularyRange | EnglishRange;
+export type GeographyRange = { kind: 'all' } | { kind: 'categories'; categories: string[] };
+export type Range = TimelineRange | VocabularyRange | EnglishRange | GeographyRange;
 
 /** 1 セッションの問題数（設計書 6.1 節の 4）。`all` は適格な全件。 */
 export type QuestionCount = 10 | 20 | 'all';
@@ -232,7 +261,10 @@ export type EnglishQuestion =
  * 1 問（全種類の教材のもの）。どれも出題した項目 `item` とパターン `pattern` を持つ。
  * 問題列と選択肢はセッション開始時に確定し、画面では変えない（設計書 6.1 節の 6）。
  */
-export type Question = TimelineQuestion | VocabularyQuestion | EnglishQuestion;
+export type GeographyQuestion =
+  | { item: GeoPlace; pattern: 'geoNameChoice'; choices: GeoPlace[] }
+  | { item: GeoPlace; pattern: 'geoNameInput' };
+export type Question = TimelineQuestion | VocabularyQuestion | EnglishQuestion | GeographyQuestion;
 
 /** 回答の記録（IndexedDB の `attempts`。追記のみで、成績の正本）。 */
 export interface Attempt {
@@ -323,4 +355,10 @@ export interface EnglishSettings {
 }
 
 /** 教材ごとに保存する出題設定（設計書 5.4 節）。 */
-export type DeckSettings = Settings | VocabularySettings | EnglishSettings;
+export interface GeographySettings {
+  scope: EventScope;
+  pattern: GeographyPatternMode;
+  count: QuestionCount;
+  range: GeographyRange;
+}
+export type DeckSettings = Settings | VocabularySettings | EnglishSettings | GeographySettings;
